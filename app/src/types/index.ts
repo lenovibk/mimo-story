@@ -4,6 +4,20 @@ export interface SubtitleItem {
   text: string;
 }
 
+export type StoryCategory =
+  | "animals"
+  | "emotions"
+  | "body"
+  | "family"
+  | "weather"
+  | "holidays"
+  | "school"
+  | "activities"
+  | "food"
+  | "world";
+
+export type StoryTag = "new" | "featured";
+
 export interface Story {
   id: string;
   title: string;
@@ -12,7 +26,8 @@ export interface Story {
   video: string;
   subtitleEn: string;
   subtitleVi: string;
-  isNew?: boolean;
+  category: StoryCategory;
+  tags?: StoryTag[];
   accent?: "primary" | "yellow" | "pink" | "green" | "night";
 }
 

@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { CircleButton, SolidPillButton } from "@/components/Button/Button";
 import { CameraPreview } from "@/components/CameraPreview/CameraPreview";
 import { FloatingButtons } from "@/components/FloatingButtons/FloatingButtons";
+import { IconBack, IconHome, IconStar } from "@/components/Icon/Icon";
 import { RewardPopup } from "@/components/RewardPopup/RewardPopup";
 import { Countdown } from "@/components/Speech/Countdown";
 import { MicIndicator } from "@/components/Speech/MicIndicator";
@@ -149,23 +150,27 @@ export function Player() {
 
       <div className="absolute inset-x-0 top-0 z-20 flex items-center justify-between p-4 sm:p-6">
         <CircleButton
-          icon="←"
+          icon={<IconBack className="h-7 w-7" />}
           color="white"
           size={56}
           ariaLabel="Back to home"
           onClick={() => navigate("/home")}
         />
         <SolidPillButton
-          icon="🦊"
           label={`${story.title}${story.episodeLabel ? ` - ${story.episodeLabel}` : ""}`}
           color="white"
           ariaLabel={story.title}
           className="hidden text-sm sm:flex"
         />
         <div className="hidden items-center gap-3 sm:flex">
-          <SolidPillButton icon="⭐" label={stars} color="white" ariaLabel="Stars collected" />
           <SolidPillButton
-            icon="🏠"
+            icon={<IconStar className="h-5 w-5 text-[#FFD54A]" />}
+            label={stars}
+            color="white"
+            ariaLabel="Stars collected"
+          />
+          <SolidPillButton
+            icon={<IconHome className="h-5 w-5" />}
             label="Home"
             color="pink"
             ariaLabel="Home"

@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
 import { useMemo } from "react";
 import { SolidPillButton } from "@/components/Button/Button";
+import { IconMic, IconPlay, IconStar, IconStarOutline } from "@/components/Icon/Icon";
 import type { StarRating } from "@/types";
 
 const PRAISE = ["Excellent!", "Amazing!", "Great Job!", "Awesome!", "Let's Go!"];
@@ -53,7 +54,7 @@ export function RewardPopup({ stars, passed, onContinue, onRetry }: RewardPopupP
         transition={{ type: "spring", stiffness: 260, damping: 18 }}
         className="mx-6 flex flex-col items-center gap-4 rounded-[32px] bg-white px-8 py-8 text-center shadow-2xl sm:px-14 sm:py-10"
       >
-        <div className="flex gap-1 text-4xl sm:text-5xl">
+        <div className="flex gap-1">
           {Array.from({ length: 5 }, (_, i) => (
             <motion.span
               key={i}
@@ -61,7 +62,11 @@ export function RewardPopup({ stars, passed, onContinue, onRetry }: RewardPopupP
               animate={{ scale: 1, rotate: 0 }}
               transition={{ delay: 0.15 + i * 0.08, type: "spring", stiffness: 300 }}
             >
-              {i < stars ? "⭐" : "☆"}
+              {i < stars ? (
+                <IconStar className="h-9 w-9 text-[#FFD54A] sm:h-11 sm:w-11" />
+              ) : (
+                <IconStarOutline className="h-9 w-9 text-slate-300 sm:h-11 sm:w-11" />
+              )}
             </motion.span>
           ))}
         </div>
@@ -72,10 +77,12 @@ export function RewardPopup({ stars, passed, onContinue, onRetry }: RewardPopupP
 
         {passed ? (
           <>
-            <p className="font-heading text-lg font-bold text-[#FFD54A]">+10 ⭐ Stars</p>
+            <p className="flex items-center gap-1 font-heading text-lg font-bold text-[#FFD54A]">
+              +10 <IconStar className="h-5 w-5" /> Stars
+            </p>
             <SolidPillButton
               label="Continue"
-              icon="▶"
+              icon={<IconPlay className="h-5 w-5" />}
               color="green"
               ariaLabel="Continue story"
               onClick={onContinue}
@@ -85,7 +92,7 @@ export function RewardPopup({ stars, passed, onContinue, onRetry }: RewardPopupP
         ) : (
           <SolidPillButton
             label="Try Again"
-            icon="🎤"
+            icon={<IconMic className="h-5 w-5" />}
             color="pink"
             ariaLabel="Try again"
             onClick={onRetry}

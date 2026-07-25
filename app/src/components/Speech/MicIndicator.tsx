@@ -1,4 +1,5 @@
 import { motion } from "framer-motion";
+import { IconMic } from "@/components/Icon/Icon";
 
 interface MicIndicatorProps {
   promptText: string;
@@ -17,8 +18,8 @@ export function MicIndicator({ promptText }: MicIndicatorProps) {
           transition={{ duration: 1.4, repeat: Infinity, ease: "easeInOut" }}
           className="absolute inset-0 rounded-full bg-[#FF92C2]"
         />
-        <span className="relative flex h-20 w-20 items-center justify-center rounded-full bg-[#FF92C2] text-4xl shadow-xl">
-          🎤
+        <span className="relative flex h-20 w-20 items-center justify-center rounded-full bg-[#FF92C2] text-white shadow-xl">
+          <IconMic className="h-9 w-9" />
         </span>
       </div>
       <p className="font-heading text-lg font-semibold text-white/85">Listening...</p>

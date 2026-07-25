@@ -1,4 +1,5 @@
 import { PillButton } from "@/components/Button/Button";
+import { IconFace, IconFlagEn, IconFlagVi, IconMic, IconPause, IconPlay } from "@/components/Icon/Icon";
 
 interface FloatingButtonsProps {
   subtitleEnOn: boolean;
@@ -28,25 +29,25 @@ export function FloatingButtons({
   return (
     <div className="absolute top-1/2 right-3 z-20 flex -translate-y-1/2 flex-col gap-3 sm:right-6 sm:gap-4">
       <PillButton
-        icon="🇬🇧"
+        icon={<IconFlagEn className="h-full w-full" />}
+        flagIcon
         label="EN"
         sublabel="Subtitle"
-        color="primary"
         active={subtitleEnOn}
         onClick={onToggleEn}
         ariaLabel="Toggle English subtitle"
       />
       <PillButton
-        icon="🇻🇳"
+        icon={<IconFlagVi className="h-full w-full" />}
+        flagIcon
         label="VI"
         sublabel="Subtitle"
-        color="pink"
         active={subtitleViOn}
         onClick={onToggleVi}
         ariaLabel="Toggle Vietnamese subtitle"
       />
       <PillButton
-        icon="😊"
+        icon={<IconFace className="h-7 w-7" />}
         label="Shadowing"
         sublabel={shadowingOn ? "ON" : "OFF"}
         color="green"
@@ -55,14 +56,14 @@ export function FloatingButtons({
         ariaLabel="Toggle shadowing camera"
       />
       <PillButton
-        icon={isPaused ? "▶" : "⏸"}
+        icon={isPaused ? <IconPlay className="h-6 w-6" /> : <IconPause className="h-6 w-6" />}
         label={isPaused ? "Play" : "Pause"}
         color="night"
         onClick={onTogglePause}
         ariaLabel={isPaused ? "Resume video" : "Pause video"}
       />
       <PillButton
-        icon="🎤"
+        icon={<IconMic className="h-6 w-6" />}
         label="Practice"
         sublabel="Speaking"
         color="pink"

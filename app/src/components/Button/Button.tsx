@@ -61,6 +61,8 @@ interface PillButtonProps extends BaseProps {
   sublabel?: ReactNode;
   /** Fill the whole pill with `color` instead of just the icon bubble (e.g. Practice Speaking). */
   solid?: boolean;
+  /** Icon is a full-bleed badge (flags) instead of a glyph on a tinted circle. */
+  flagIcon?: boolean;
 }
 
 /** Floating pill: colored icon bubble + short label, used for the player's side controls. */
@@ -72,6 +74,7 @@ export function PillButton({
   color = "primary",
   active = true,
   solid = false,
+  flagIcon = false,
   className = "",
   ariaLabel,
   disabled,
@@ -89,7 +92,7 @@ export function PillButton({
           active ? CIRCLE_COLORS[color] : "bg-slate-300 text-slate-500"
         } ${disabled ? "opacity-50" : ""} ${className}`}
       >
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/25 text-2xl">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/25">
           {icon}
         </span>
         <span className="flex flex-col items-start leading-tight font-heading">
@@ -112,13 +115,23 @@ export function PillButton({
         disabled ? "opacity-50" : ""
       } ${className}`}
     >
-      <span
-        className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-2xl ${
-          active ? CIRCLE_COLORS[color] : "bg-slate-200 text-slate-400"
-        }`}
-      >
-        {icon}
-      </span>
+      {flagIcon ? (
+        <span
+          className={`h-12 w-12 shrink-0 overflow-hidden rounded-full ring-2 ring-black/5 transition-[filter,opacity] ${
+            active ? "" : "opacity-45 grayscale"
+          }`}
+        >
+          {icon}
+        </span>
+      ) : (
+        <span
+          className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full ${
+            active ? CIRCLE_COLORS[color] : "bg-slate-200 text-slate-400"
+          }`}
+        >
+          {icon}
+        </span>
+      )}
       <span className="flex flex-col items-start leading-tight font-heading text-slate-700">
         <span className="text-sm font-semibold whitespace-nowrap">{label}</span>
         {sublabel && <span className="text-xs font-medium text-slate-400">{sublabel}</span>}

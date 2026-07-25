@@ -1,21 +1,18 @@
-const LETTER_COLORS = ["#FF92C2", "#FFD54A", "#5CC8FF", "#8EE28E", "#FF92C2", "#5CC8FF", "#FFD54A"];
+import logoImg from "@/assets/images/logo.png";
 
 interface LogoProps {
   size?: "md" | "lg";
+  className?: string;
 }
 
-export function Logo({ size = "md" }: LogoProps) {
-  const textSize = size === "lg" ? "text-5xl sm:text-6xl" : "text-2xl sm:text-3xl";
+export function Logo({ size = "md", className = "" }: LogoProps) {
+  const heightClass = size === "lg" ? "h-16 sm:h-20" : "h-9 sm:h-11";
   return (
-    <div className="no-select flex items-center gap-2">
-      <span className={size === "lg" ? "text-5xl sm:text-6xl" : "text-3xl"}>🌈</span>
-      <span className={`font-heading font-extrabold tracking-tight ${textSize}`}>
-        {"MimoKids".split("").map((letter, i) => (
-          <span key={i} style={{ color: LETTER_COLORS[i % LETTER_COLORS.length] }}>
-            {letter}
-          </span>
-        ))}
-      </span>
-    </div>
+    <img
+      src={logoImg}
+      alt="MimoKids"
+      draggable={false}
+      className={`no-select w-auto object-contain drop-shadow-sm ${heightClass} ${className}`}
+    />
   );
 }
