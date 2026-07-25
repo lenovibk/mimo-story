@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">MimoKids</string>
+    <string name="title_activity_main">MimoKids</string>
+    <string name="package_name">com.mimokids.app</string>
+    <string name="custom_url_scheme">com.mimokids.app</string>
+</resources>

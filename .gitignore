@@ -1,0 +1,6 @@
+# Licensed third-party story media (e.g. Little Fox) - not ours to redistribute.
+# Add your own video/audio locally; these paths stay untracked.
+example/*.mp4
+example/*.mp3
+app/public/stories/**/*.mp4
+app/public/stories/**/*.mp3
