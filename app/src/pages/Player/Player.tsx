@@ -186,8 +186,8 @@ export function Player() {
       onPointerMove={revealControls}
     >
       <video
+        key={story.id}
         ref={videoRef}
-        src={story.video}
         autoPlay
         playsInline
         disablePictureInPicture
@@ -195,7 +195,10 @@ export function Player() {
         onContextMenu={(e) => e.preventDefault()}
         onEnded={() => navigate("/home")}
         className="h-full w-full object-contain"
-      />
+      >
+        {story.videoWebm && <source src={story.videoWebm} type="video/webm" />}
+        <source src={story.video} type="video/mp4" />
+      </video>
 
       <div
         className={`absolute inset-x-0 top-0 z-20 flex items-center justify-between p-4 transition-opacity duration-300 sm:p-6 ${

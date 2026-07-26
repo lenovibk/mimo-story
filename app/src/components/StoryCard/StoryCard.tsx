@@ -31,17 +31,20 @@ export const StoryCard = forwardRef<HTMLButtonElement, StoryCardProps>(function 
         isActive ? "shadow-black/20 ring-white" : "shadow-black/10 ring-white/70"
       }`}
     >
-      <img
-        src={story.cover}
-        alt=""
-        draggable={false}
-        onError={(e) => {
-          const img = e.currentTarget;
-          if (img.src.endsWith(DEFAULT_COVER)) return;
-          img.src = DEFAULT_COVER;
-        }}
-        className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-      />
+      <picture>
+        {story.coverWebp && <source srcSet={story.coverWebp} type="image/webp" />}
+        <img
+          src={story.cover}
+          alt=""
+          draggable={false}
+          onError={(e) => {
+            const img = e.currentTarget;
+            if (img.src.endsWith(DEFAULT_COVER)) return;
+            img.src = DEFAULT_COVER;
+          }}
+          className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+        />
+      </picture>
       <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/0 to-black/10" />
 
       {isActive && (

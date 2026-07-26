@@ -23,7 +23,11 @@ export interface Story {
   title: string;
   episodeLabel?: string;
   cover: string;
+  /** WebP cover, smaller than `cover`. Used when present; `cover` (jpg) stays as fallback. */
+  coverWebp?: string;
   video: string;
+  /** VP9/Opus WebM, smaller than `video` but unsupported on iOS/Safari. Tried first when present. */
+  videoWebm?: string;
   subtitleEn: string;
   subtitleVi: string;
   category: StoryCategory;
