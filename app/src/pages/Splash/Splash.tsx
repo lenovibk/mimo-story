@@ -15,7 +15,7 @@ export function Splash() {
   }, [navigate]);
 
   return (
-    <div className="relative flex h-full min-h-svh w-full items-center justify-center">
+    <div className="relative flex h-full w-full items-center justify-center">
       <SkyBackground />
 
       <motion.div

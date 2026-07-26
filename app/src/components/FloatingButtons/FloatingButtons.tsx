@@ -27,7 +27,7 @@ export function FloatingButtons({
   practiceDisabled,
 }: FloatingButtonsProps) {
   return (
-    <div className="absolute top-1/2 right-2 z-20 flex -translate-y-1/2 flex-col gap-2 sm:right-6 sm:gap-4 landscape-compact:right-1.5 landscape-compact:gap-1.5">
+    <div className="absolute top-1/2 right-[max(0.5rem,var(--safe-r))] z-20 flex -translate-y-1/2 flex-col gap-2 sm:right-[max(1.5rem,var(--safe-r))] sm:gap-4 landscape-compact:right-[max(0.375rem,var(--safe-r))] landscape-compact:gap-1.5">
       <PillButton
         icon={<IconFlagEn className="h-full w-full" />}
         flagIcon

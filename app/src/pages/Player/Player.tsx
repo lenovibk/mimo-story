@@ -25,8 +25,27 @@ import type { PronunciationResult } from "@/types";
 
 type Phase = "idle" | "countdown" | "listening" | "reward";
 
-const LISTEN_DURATION_MS = 3200;
+const LISTEN_MIN_MS = 4000;
+const LISTEN_MAX_MS = 12000;
+const LISTEN_BASE_MS = 2200;
+const LISTEN_MS_PER_WORD = 650;
+// Recognition.stop() races the STT backend's own processing of the tail end
+// of speech - if the child finishes right as the timer fires, the last word
+// can still get dropped from the transcript even though the mic captured it.
+// Pad the window so the backend has time to settle before we force a stop.
+const LISTEN_SETTLE_MS = 900;
 const CONTROLS_HIDE_DELAY_MS = 3000;
+
+/**
+ * A fixed listen window cuts kids off mid-sentence for anything longer than a
+ * couple of words. Scale the window with how much the child actually has to
+ * say, capped so a hung mic/session can't strand them on "Listening..." forever.
+ */
+function getListenDuration(target: string): number {
+  const wordCount = target.split(/\s+/).filter(Boolean).length;
+  const estimated = LISTEN_BASE_MS + wordCount * LISTEN_MS_PER_WORD + LISTEN_SETTLE_MS;
+  return Math.min(LISTEN_MAX_MS, Math.max(LISTEN_MIN_MS, estimated));
+}
 
 export function Player() {
   const { id } = useParams<{ id: string }>();
@@ -38,6 +57,7 @@ export function Player() {
   const containerRef = useRef<HTMLDivElement>(null);
   const listenTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const audioUrlRef = useRef<string | null>(null);
+  const finishingRef = useRef(false);
 
   const [currentTime, setCurrentTime] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
@@ -118,7 +138,7 @@ export function Player() {
 
   if (!story) {
     return (
-      <div className="flex h-svh flex-col items-center justify-center gap-4 bg-[#F7FBFF] px-6 text-center">
+      <div className="flex h-full flex-col items-center justify-center gap-4 bg-[#F7FBFF] px-6 text-center">
         <p className="font-heading text-2xl font-bold text-slate-600">Không tìm thấy truyện</p>
         <SolidPillButton
           label="Về trang chủ"
@@ -161,6 +181,8 @@ export function Player() {
   };
 
   const finishListening = async () => {
+    if (finishingRef.current) return;
+    finishingRef.current = true;
     if (listenTimerRef.current) {
       clearTimeout(listenTimerRef.current);
       listenTimerRef.current = null;
@@ -187,11 +209,17 @@ export function Player() {
   };
 
   const handleCountdownComplete = () => {
+    finishingRef.current = false;
     setPhase("listening");
     playReadyChime();
-    // Arm the fallback timer immediately - if start() hangs (no mic, no network
+    // Arm the stop timer immediately - if start() hangs (no mic, no network
     // speech backend, etc.) the child must never be stuck on "Listening..." forever.
-    listenTimerRef.current = setTimeout(() => void finishListening(), LISTEN_DURATION_MS);
+    // Duration scales with sentence length so short cues don't wait needlessly
+    // and longer ones aren't cut off mid-sentence.
+    listenTimerRef.current = setTimeout(
+      () => void finishListening(),
+      getListenDuration(practiceTarget)
+    );
     getSpeechProvider()
       .start("en-US")
       .catch(() => {
@@ -235,7 +263,7 @@ export function Player() {
   return (
     <div
       ref={containerRef}
-      className="relative h-svh w-full touch-none overflow-hidden bg-black"
+      className="relative h-full w-full touch-none overflow-hidden bg-black"
       onClick={handleScreenTap}
     >
       <video
@@ -254,9 +282,9 @@ export function Player() {
       </video>
 
       <div
-        className={`absolute inset-x-0 top-0 z-20 flex items-center justify-between p-3 transition-opacity duration-300 sm:p-6 landscape-compact:p-2 ${
+        className={`absolute inset-x-0 top-0 z-20 flex items-center justify-between transition-opacity duration-300 ${
           controlsVisible ? "opacity-100" : "pointer-events-none opacity-0"
-        }`}
+        } pt-[max(0.75rem,var(--safe-t))] pb-[max(0.75rem,var(--safe-b))] pr-[max(0.75rem,var(--safe-r))] pl-[max(0.75rem,var(--safe-l))] sm:pt-[max(1.5rem,var(--safe-t))] sm:pb-[max(1.5rem,var(--safe-b))] sm:pr-[max(1.5rem,var(--safe-r))] sm:pl-[max(1.5rem,var(--safe-l))] landscape-compact:pt-[max(0.5rem,var(--safe-t))] landscape-compact:pb-[max(0.5rem,var(--safe-b))] landscape-compact:pr-[max(0.5rem,var(--safe-r))] landscape-compact:pl-[max(0.5rem,var(--safe-l))]`}
       >
         <CircleButton
           icon={<IconBack className="h-6 w-6 sm:h-7 sm:w-7" />}
@@ -323,6 +351,7 @@ export function Player() {
         <MicIndicator
           promptText={practiceTarget}
           getStream={() => getAudioRecorder().getStream?.() ?? null}
+          onStop={() => void finishListening()}
         />
       )}
       {phase === "reward" && result && (

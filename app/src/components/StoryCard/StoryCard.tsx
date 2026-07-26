@@ -24,7 +24,6 @@ export const StoryCard = forwardRef<HTMLButtonElement, StoryCardProps>(function 
       whileHover={{ rotate: isActive ? [0, -1.5, 1.5, 0] : 0 }}
       animate={{
         scale: isActive ? 1 : 0.9,
-        y: isActive ? -8 : 0,
         opacity: isActive ? 1 : 0.7,
       }}
       transition={{ type: "spring", stiffness: 300, damping: 24 }}

@@ -2,6 +2,7 @@
 
 | File | Nội dung |
 |---|---|
+| [speech-recording.md](speech-recording.md) | Luồng ghi âm/nhận diện giọng nói/chấm điểm phát âm (Practice Speaking) — kiến trúc, các bug đã gặp/đã sửa, giới hạn còn tồn tại. |
 | [story-pipeline.md](story-pipeline.md) | Quy trình biến video trong `example/stories/` thành truyện trong app — dùng khi có video mới. |
 | [design.md](design.md) | PRD/thiết kế tổng thể của app (bản gốc: `design/design.md`). |
 | [app-readme.md](app-readme.md) | README mặc định của template Vite (bản gốc: `app/README.md`). |

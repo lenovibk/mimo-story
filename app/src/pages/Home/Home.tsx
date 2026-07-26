@@ -179,7 +179,7 @@ export function Home() {
   useEffect(() => () => window.clearTimeout(hideTimerRef.current), []);
 
   return (
-    <div className="relative min-h-svh w-full overflow-hidden">
+    <div className="relative h-full w-full overflow-hidden">
       <SkyBackground />
       <div
         className="absolute inset-x-0 bottom-0 bg-[#8EE28E]/70"
@@ -190,7 +190,7 @@ export function Home() {
         }}
       />
 
-      <div className="relative z-10 flex min-h-svh flex-col">
+      <div className="relative z-10 flex h-full flex-col">
         <motion.header
           initial={{ opacity: 0, y: -16 }}
           animate={{ opacity: 1, y: 0 }}
@@ -230,7 +230,7 @@ export function Home() {
           <div
             ref={catRailRef}
             onScroll={updateCatEdge}
-            className="no-select no-scrollbar flex gap-1.5 overflow-x-auto rounded-full bg-white/15 p-1.5 shadow-inner backdrop-blur-sm sm:justify-center"
+            className="no-select no-scrollbar flex gap-1.5 overflow-x-auto rounded-full bg-white/15 p-1.5 shadow-inner backdrop-blur-sm"
             style={{
               maskImage: `linear-gradient(to right, ${catEdge.atStart ? "black" : "transparent"} 0px, black 20px, black calc(100% - 20px), ${catEdge.atEnd ? "black" : "transparent"} 100%)`,
               WebkitMaskImage: `linear-gradient(to right, ${catEdge.atStart ? "black" : "transparent"} 0px, black 20px, black calc(100% - 20px), ${catEdge.atEnd ? "black" : "transparent"} 100%)`,
@@ -318,7 +318,7 @@ export function Home() {
             onPointerLeave={endDrag}
             onPointerCancel={endDrag}
             onClickCapture={handleClickCapture}
-            className={`no-select no-scrollbar flex w-full snap-x snap-proximity gap-5 overflow-x-auto pt-3 pb-4 sm:gap-7 landscape-compact:gap-3 landscape-compact:pt-2 ${
+            className={`no-select no-scrollbar flex w-full shrink-0 snap-x snap-proximity gap-5 overflow-x-auto pt-3 pb-4 sm:gap-7 landscape-compact:gap-3 landscape-compact:pt-2 ${
               isDragging ? "cursor-grabbing" : "cursor-grab"
             }`}
             style={{

@@ -12,6 +12,35 @@ function splitWords(text: string): string[] {
   return text.split(/\s+/).filter(Boolean);
 }
 
+function levenshtein(a: string, b: string): number {
+  let prev = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) {
+    const curr = new Array<number>(b.length + 1);
+    curr[0] = i;
+    for (let j = 1; j <= b.length; j++) {
+      curr[j] =
+        a[i - 1] === b[j - 1]
+          ? prev[j - 1]
+          : 1 + Math.min(prev[j - 1], prev[j], curr[j - 1]);
+    }
+    prev = curr;
+  }
+  return prev[b.length];
+}
+
+/**
+ * STT frequently mishears a single phoneme ("cat" -> "cap"). Treating that as
+ * a full miss is especially harsh on short targets, where one word is a huge
+ * share of the score. Allow a small edit-distance slack scaled to word length.
+ */
+function isCloseMatch(a: string, b: string): boolean {
+  if (a === b) return true;
+  const maxLen = Math.max(a.length, b.length);
+  if (maxLen < 3) return false;
+  const allowed = maxLen <= 4 ? 1 : Math.floor(maxLen * 0.3);
+  return levenshtein(a, b) <= allowed;
+}
+
 /**
  * Order-independent word overlap between what the child said and the target
  * sentence. Kid speech recognition is noisy, so this stays generous on purpose.
@@ -28,7 +57,9 @@ export function scorePronunciation(
   const remaining = [...saidWords];
   const words: WordMatch[] = expectedTokens.map((token) => {
     const norm = normalizeWord(token);
-    const idx = norm ? remaining.indexOf(norm) : -1;
+    if (!norm) return { word: token, matched: false };
+    let idx = remaining.indexOf(norm);
+    if (idx === -1) idx = remaining.findIndex((said) => isCloseMatch(norm, said));
     if (idx !== -1) remaining.splice(idx, 1);
     return { word: token, matched: idx !== -1 };
   });
