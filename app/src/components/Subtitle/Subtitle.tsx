@@ -27,7 +27,7 @@ export function Subtitle({ enCue, viCue, currentTime, showEn, showVi }: Subtitle
   if ((!enCue && !viCue) || (!showEn && !showVi)) return null;
 
   return (
-    <div className="pointer-events-none absolute inset-x-0 bottom-28 flex justify-center px-4 sm:bottom-10">
+    <div className="pointer-events-none absolute inset-x-0 bottom-20 flex justify-center px-3 sm:bottom-10 sm:px-4 landscape-compact:bottom-2">
       <AnimatePresence mode="wait">
         <motion.div
           key={`${enCue?.start ?? "x"}-${viCue?.start ?? "x"}`}
@@ -35,10 +35,10 @@ export function Subtitle({ enCue, viCue, currentTime, showEn, showVi }: Subtitle
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -8 }}
           transition={{ duration: 0.25 }}
-          className="max-w-3xl rounded-3xl bg-black/55 px-6 py-4 text-center shadow-xl backdrop-blur-sm sm:px-10 sm:py-5"
+          className="max-w-3xl rounded-2xl bg-black/55 px-4 py-2.5 text-center shadow-xl backdrop-blur-sm sm:rounded-3xl sm:px-10 sm:py-5 landscape-compact:rounded-xl landscape-compact:px-3 landscape-compact:py-1.5"
         >
           {showEn && enCue && (
-            <p className="font-heading text-2xl leading-snug font-bold text-white sm:text-4xl">
+            <p className="font-heading text-lg leading-snug font-bold text-white sm:text-4xl landscape-compact:text-sm">
               {enWords.map((word, i) => (
                 <span
                   key={i}
@@ -54,7 +54,7 @@ export function Subtitle({ enCue, viCue, currentTime, showEn, showVi }: Subtitle
             </p>
           )}
           {showVi && viCue && (
-            <p className="mt-1 font-body text-lg font-semibold text-white/85 sm:text-2xl">
+            <p className="mt-0.5 font-body text-sm font-semibold text-white/85 sm:mt-1 sm:text-2xl landscape-compact:mt-0 landscape-compact:text-xs">
               {viCue.text}
             </p>
           )}

@@ -64,6 +64,26 @@ export function Home() {
     }
   };
 
+  // Same edge-fade idea for the category tray: only fade a side that still has
+  // more chips to scroll to, so a short, fully-visible list stays fully opaque.
+  const catRailRef = useRef<HTMLDivElement>(null);
+  const [catEdge, setCatEdge] = useState({ atStart: true, atEnd: true });
+
+  const updateCatEdge = () => {
+    const el = catRailRef.current;
+    if (!el) return;
+    setCatEdge({
+      atStart: el.scrollLeft <= 4,
+      atEnd: el.scrollLeft >= el.scrollWidth - el.clientWidth - 4,
+    });
+  };
+
+  useEffect(() => {
+    updateCatEdge();
+    window.addEventListener("resize", updateCatEdge);
+    return () => window.removeEventListener("resize", updateCatEdge);
+  }, []);
+
   useEffect(() => {
     const rail = railRef.current;
     if (rail) rail.scrollLeft = 0;
@@ -141,21 +161,47 @@ export function Home() {
     playWhoosh(direction);
   };
 
+  // Prev/next arrows stay out of the way until a mouse hovers the rail or a finger taps it,
+  // then auto-hide again so they don't clutter the view (especially on short landscape screens).
+  const [controlsVisible, setControlsVisible] = useState(false);
+  const hideTimerRef = useRef<number | undefined>(undefined);
+
+  const revealControls = () => {
+    setControlsVisible(true);
+    window.clearTimeout(hideTimerRef.current);
+    hideTimerRef.current = window.setTimeout(() => setControlsVisible(false), 2500);
+  };
+  const hideControlsNow = () => {
+    window.clearTimeout(hideTimerRef.current);
+    setControlsVisible(false);
+  };
+
+  useEffect(() => () => window.clearTimeout(hideTimerRef.current), []);
+
   return (
     <div className="relative min-h-svh w-full overflow-hidden">
       <SkyBackground />
       <div
-        className="absolute inset-x-0 bottom-0 h-28 bg-[#8EE28E]/70"
-        style={{ borderRadius: "50% 50% 0 0 / 100% 100% 0 0", transform: "scale(1.4, 1)" }}
+        className="absolute inset-x-0 bottom-0 bg-[#8EE28E]/70"
+        style={{
+          height: "calc(7rem + var(--safe-b))",
+          borderRadius: "50% 50% 0 0 / 100% 100% 0 0",
+          transform: "scale(1.4, 1)",
+        }}
       />
 
       <div className="relative z-10 flex min-h-svh flex-col">
-        <header className="flex flex-wrap items-center justify-between gap-4 px-5 pt-6 sm:px-10">
+        <motion.header
+          initial={{ opacity: 0, y: -16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, ease: "easeOut" }}
+          className="safe-px safe-pt flex flex-wrap items-center justify-between gap-4 landscape-compact:gap-2"
+        >
           <Logo />
-          <h1 className="order-3 flex w-full items-center justify-center gap-2 text-center font-heading text-xl font-bold text-white drop-shadow-sm sm:order-2 sm:w-auto sm:text-2xl">
-            <IconStar className="h-5 w-5 text-[#FFD54A] sm:h-6 sm:w-6" />
+          <h1 className="order-3 flex w-full items-center justify-center gap-2 text-center font-heading text-xl font-bold text-white drop-shadow-sm sm:order-2 sm:w-auto sm:text-2xl landscape-compact:text-base landscape-compact:gap-1">
+            <IconStar className="h-5 w-5 text-[#FFD54A] sm:h-6 sm:w-6 landscape-compact:h-4 landscape-compact:w-4" />
             Chọn truyện để bắt đầu
-            <IconStar className="h-5 w-5 text-[#FFD54A] sm:h-6 sm:w-6" />
+            <IconStar className="h-5 w-5 text-[#FFD54A] sm:h-6 sm:w-6 landscape-compact:h-4 landscape-compact:w-4" />
           </h1>
           <div className="order-2 flex items-center gap-3 sm:order-3">
             <SolidPillButton
@@ -173,51 +219,94 @@ export function Home() {
               onClick={() => setSettingsOpen(true)}
             />
           </div>
-        </header>
+        </motion.header>
 
-        <div className="no-select flex gap-2 overflow-x-auto px-5 pt-4 sm:justify-center sm:px-10">
-          <button
-            type="button"
-            onClick={() => setCategory(null)}
-            className={`shrink-0 rounded-full px-4 py-2 font-heading text-sm font-semibold shadow-md transition-colors ${
-              category === null ? "bg-white text-[#5CC8FF]" : "bg-white/40 text-white hover:bg-white/60"
-            }`}
+        <motion.div
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.05, ease: "easeOut" }}
+          className="safe-px pt-4 landscape-compact:pt-2"
+        >
+          <div
+            ref={catRailRef}
+            onScroll={updateCatEdge}
+            className="no-select no-scrollbar flex gap-1.5 overflow-x-auto rounded-full bg-white/15 p-1.5 shadow-inner backdrop-blur-sm sm:justify-center"
+            style={{
+              maskImage: `linear-gradient(to right, ${catEdge.atStart ? "black" : "transparent"} 0px, black 20px, black calc(100% - 20px), ${catEdge.atEnd ? "black" : "transparent"} 100%)`,
+              WebkitMaskImage: `linear-gradient(to right, ${catEdge.atStart ? "black" : "transparent"} 0px, black 20px, black calc(100% - 20px), ${catEdge.atEnd ? "black" : "transparent"} 100%)`,
+            }}
           >
-            Tất cả
-          </button>
-          {storyCategories.map((c) => (
-            <button
-              key={c.id}
+            <motion.button
               type="button"
-              onClick={() => setCategory(c.id)}
-              className={`shrink-0 rounded-full px-4 py-2 font-heading text-sm font-semibold shadow-md transition-colors ${
-                category === c.id ? "bg-white text-[#5CC8FF]" : "bg-white/40 text-white hover:bg-white/60"
+              whileTap={{ scale: 0.94 }}
+              onClick={() => setCategory(null)}
+              className={`relative shrink-0 rounded-full px-4 py-2 font-heading text-sm font-semibold transition-colors duration-200 ${
+                category === null ? "text-[#5CC8FF]" : "text-white hover:bg-white/15"
               }`}
             >
-              {c.label}
-            </button>
-          ))}
-        </div>
+              {category === null && (
+                <motion.span
+                  layoutId="categoryHighlight"
+                  className="absolute inset-0 rounded-full bg-white shadow-md"
+                  transition={{ type: "spring", stiffness: 400, damping: 32 }}
+                />
+              )}
+              <span className="relative z-10">Tất cả</span>
+            </motion.button>
+            {storyCategories.map((c) => (
+              <motion.button
+                key={c.id}
+                type="button"
+                whileTap={{ scale: 0.94 }}
+                onClick={() => setCategory(c.id)}
+                className={`relative shrink-0 rounded-full px-4 py-2 font-heading text-sm font-semibold transition-colors duration-200 ${
+                  category === c.id ? "text-[#5CC8FF]" : "text-white hover:bg-white/15"
+                }`}
+              >
+                {category === c.id && (
+                  <motion.span
+                    layoutId="categoryHighlight"
+                    className="absolute inset-0 rounded-full bg-white shadow-md"
+                    transition={{ type: "spring", stiffness: 400, damping: 32 }}
+                  />
+                )}
+                <span className="relative z-10">{c.label}</span>
+              </motion.button>
+            ))}
+          </div>
+        </motion.div>
 
-        <main className="relative flex flex-1 items-center px-5 py-10 sm:px-10">
-          <CircleButton
-            icon={<IconChevronLeft className="h-7 w-7" />}
-            color="white"
-            size={56}
-            ariaLabel="Truyện trước"
-            onClick={() => goTo(-1)}
-            disabled={edge.atStart}
-            className="absolute top-1/2 left-1 z-10 hidden -translate-y-1/2 sm:flex"
-          />
-          <CircleButton
-            icon={<IconChevronRight className="h-7 w-7" />}
-            color="white"
-            size={56}
-            ariaLabel="Truyện tiếp theo"
-            onClick={() => goTo(1)}
-            disabled={edge.atEnd}
-            className="absolute top-1/2 right-1 z-10 hidden -translate-y-1/2 sm:flex"
-          />
+        <main
+          className="safe-px relative flex flex-1 items-center py-10 landscape-compact:py-3"
+          onMouseEnter={revealControls}
+          onMouseMove={revealControls}
+          onMouseLeave={hideControlsNow}
+          onTouchStart={revealControls}
+        >
+          <div
+            className={`pointer-events-none absolute inset-0 z-10 transition-opacity duration-300 ${
+              controlsVisible ? "opacity-100 pointer-events-auto" : "opacity-0"
+            }`}
+          >
+            <CircleButton
+              icon={<IconChevronLeft className="h-7 w-7" />}
+              color="white"
+              size={56}
+              ariaLabel="Truyện trước"
+              onClick={() => goTo(-1)}
+              disabled={edge.atStart}
+              className="absolute top-1/2 left-1 -translate-y-1/2"
+            />
+            <CircleButton
+              icon={<IconChevronRight className="h-7 w-7" />}
+              color="white"
+              size={56}
+              ariaLabel="Truyện tiếp theo"
+              onClick={() => goTo(1)}
+              disabled={edge.atEnd}
+              className="absolute top-1/2 right-1 -translate-y-1/2"
+            />
+          </div>
 
           <div
             ref={railRef}
@@ -229,10 +318,14 @@ export function Home() {
             onPointerLeave={endDrag}
             onPointerCancel={endDrag}
             onClickCapture={handleClickCapture}
-            className={`no-select flex w-full snap-x snap-proximity gap-5 overflow-x-auto pb-4 sm:gap-7 ${
+            className={`no-select no-scrollbar flex w-full snap-x snap-proximity gap-5 overflow-x-auto pt-3 pb-4 sm:gap-7 landscape-compact:gap-3 landscape-compact:pt-2 ${
               isDragging ? "cursor-grabbing" : "cursor-grab"
             }`}
-            style={{ scrollPadding: "0 8px" }}
+            style={{
+              scrollPadding: "0 8px",
+              maskImage: `linear-gradient(to right, ${edge.atStart ? "black" : "transparent"} 0px, black 32px, black calc(100% - 32px), ${edge.atEnd ? "black" : "transparent"} 100%)`,
+              WebkitMaskImage: `linear-gradient(to right, ${edge.atStart ? "black" : "transparent"} 0px, black 32px, black calc(100% - 32px), ${edge.atEnd ? "black" : "transparent"} 100%)`,
+            }}
           >
             {visibleStories.map((story) => (
               <div
@@ -249,13 +342,18 @@ export function Home() {
           </div>
         </main>
 
-        <footer className="pb-6 text-center">
+        <motion.footer
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.1, ease: "easeOut" }}
+          className="safe-pb text-center landscape-compact:hidden"
+        >
           <p className="mx-auto inline-flex items-center gap-2 rounded-full bg-white/85 px-6 py-2 font-heading text-sm font-semibold text-slate-600 shadow-md">
             <IconStar className="h-4 w-4 text-[#FFD54A]" />
             Học mà chơi - Chơi mà học - Bé vui mỗi ngày!
             <IconHeart className="h-4 w-4 text-[#FF92C2]" />
           </p>
-        </footer>
+        </motion.footer>
       </div>
 
       <AnimatePresence>

@@ -88,16 +88,22 @@ export function PillButton({
         disabled={disabled}
         whileTap={{ scale: 0.94 }}
         whileHover={disabled ? undefined : { scale: 1.03 }}
-        className={`no-select flex min-h-[64px] items-center gap-3 rounded-full py-2 pr-5 pl-3 shadow-lg shadow-black/15 transition-opacity ${
+        className={`no-select flex min-h-[52px] items-center gap-2 rounded-full py-1.5 pr-4 pl-2.5 shadow-lg shadow-black/15 transition-opacity sm:min-h-[64px] sm:gap-3 sm:py-2 sm:pr-5 sm:pl-3 landscape-compact:min-h-[40px] landscape-compact:gap-1.5 landscape-compact:py-1 landscape-compact:pr-3 landscape-compact:pl-2 ${
           active ? CIRCLE_COLORS[color] : "bg-slate-300 text-slate-500"
         } ${disabled ? "opacity-50" : ""} ${className}`}
       >
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/25">
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/25 sm:h-10 sm:w-10 landscape-compact:h-7 landscape-compact:w-7">
           {icon}
         </span>
         <span className="flex flex-col items-start leading-tight font-heading">
-          <span className="text-sm font-bold whitespace-nowrap">{label}</span>
-          {sublabel && <span className="text-xs font-medium opacity-85">{sublabel}</span>}
+          <span className="text-xs font-bold whitespace-nowrap sm:text-sm landscape-compact:text-[11px]">
+            {label}
+          </span>
+          {sublabel && (
+            <span className="text-[10px] font-medium opacity-85 sm:text-xs landscape-compact:hidden">
+              {sublabel}
+            </span>
+          )}
         </span>
       </motion.button>
     );
@@ -111,13 +117,13 @@ export function PillButton({
       disabled={disabled}
       whileTap={{ scale: 0.94 }}
       whileHover={disabled ? undefined : { scale: 1.03 }}
-      className={`no-select flex min-h-[64px] items-center gap-3 rounded-full bg-white/95 py-2 pr-5 pl-2 shadow-lg shadow-black/10 backdrop-blur transition-opacity ${
+      className={`no-select flex min-h-[52px] items-center gap-2 rounded-full bg-white/95 py-1.5 pr-4 pl-1.5 shadow-lg shadow-black/10 backdrop-blur transition-opacity sm:min-h-[64px] sm:gap-3 sm:py-2 sm:pr-5 sm:pl-2 landscape-compact:min-h-[40px] landscape-compact:gap-1.5 landscape-compact:py-1 landscape-compact:pr-3 landscape-compact:pl-1 ${
         disabled ? "opacity-50" : ""
       } ${className}`}
     >
       {flagIcon ? (
         <span
-          className={`h-12 w-12 shrink-0 overflow-hidden rounded-full ring-2 ring-black/5 transition-[filter,opacity] ${
+          className={`h-9 w-9 shrink-0 overflow-hidden rounded-full ring-2 ring-black/5 transition-[filter,opacity] sm:h-12 sm:w-12 landscape-compact:h-7 landscape-compact:w-7 ${
             active ? "" : "opacity-45 grayscale"
           }`}
         >
@@ -125,7 +131,7 @@ export function PillButton({
         </span>
       ) : (
         <span
-          className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full ${
+          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full sm:h-12 sm:w-12 landscape-compact:h-7 landscape-compact:w-7 ${
             active ? CIRCLE_COLORS[color] : "bg-slate-200 text-slate-400"
           }`}
         >
@@ -133,8 +139,14 @@ export function PillButton({
         </span>
       )}
       <span className="flex flex-col items-start leading-tight font-heading text-slate-700">
-        <span className="text-sm font-semibold whitespace-nowrap">{label}</span>
-        {sublabel && <span className="text-xs font-medium text-slate-400">{sublabel}</span>}
+        <span className="text-xs font-semibold whitespace-nowrap sm:text-sm landscape-compact:text-[11px]">
+          {label}
+        </span>
+        {sublabel && (
+          <span className="text-[10px] font-medium text-slate-400 sm:text-xs landscape-compact:hidden">
+            {sublabel}
+          </span>
+        )}
       </span>
     </motion.button>
   );

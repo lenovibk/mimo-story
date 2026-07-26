@@ -11,6 +11,9 @@ interface AppState {
   toggleSubtitleEn: () => void;
   toggleSubtitleVi: () => void;
   toggleShadowing: () => void;
+
+  autoPlayNext: boolean;
+  toggleAutoPlayNext: () => void;
 }
 
 export const useAppStore = create<AppState>()(
@@ -25,6 +28,9 @@ export const useAppStore = create<AppState>()(
       toggleSubtitleEn: () => set((state) => ({ subtitleEnOn: !state.subtitleEnOn })),
       toggleSubtitleVi: () => set((state) => ({ subtitleViOn: !state.subtitleViOn })),
       toggleShadowing: () => set((state) => ({ shadowingOn: !state.shadowingOn })),
+
+      autoPlayNext: false,
+      toggleAutoPlayNext: () => set((state) => ({ autoPlayNext: !state.autoPlayNext })),
     }),
     { name: "mimokids-app" }
   )

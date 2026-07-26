@@ -27,7 +27,7 @@ export function FloatingButtons({
   practiceDisabled,
 }: FloatingButtonsProps) {
   return (
-    <div className="absolute top-1/2 right-3 z-20 flex -translate-y-1/2 flex-col gap-3 sm:right-6 sm:gap-4">
+    <div className="absolute top-1/2 right-2 z-20 flex -translate-y-1/2 flex-col gap-2 sm:right-6 sm:gap-4 landscape-compact:right-1.5 landscape-compact:gap-1.5">
       <PillButton
         icon={<IconFlagEn className="h-full w-full" />}
         flagIcon
@@ -47,7 +47,7 @@ export function FloatingButtons({
         ariaLabel="Toggle Vietnamese subtitle"
       />
       <PillButton
-        icon={<IconFace className="h-7 w-7" />}
+        icon={<IconFace className="h-5 w-5 sm:h-7 sm:w-7" />}
         label="Shadowing"
         sublabel={shadowingOn ? "ON" : "OFF"}
         color="green"
@@ -56,14 +56,20 @@ export function FloatingButtons({
         ariaLabel="Toggle shadowing camera"
       />
       <PillButton
-        icon={isPaused ? <IconPlay className="h-6 w-6" /> : <IconPause className="h-6 w-6" />}
+        icon={
+          isPaused ? (
+            <IconPlay className="h-4 w-4 sm:h-6 sm:w-6" />
+          ) : (
+            <IconPause className="h-4 w-4 sm:h-6 sm:w-6" />
+          )
+        }
         label={isPaused ? "Play" : "Pause"}
         color="night"
         onClick={onTogglePause}
         ariaLabel={isPaused ? "Resume video" : "Pause video"}
       />
       <PillButton
-        icon={<IconMic className="h-6 w-6" />}
+        icon={<IconMic className="h-4 w-4 sm:h-6 sm:w-6" />}
         label="Practice"
         sublabel="Speaking"
         color="pink"

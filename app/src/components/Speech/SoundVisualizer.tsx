@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { getSharedAudioContext } from "@/services/Sound/audioContext";
 
 interface SoundVisualizerProps {
   /** Returns the live mic stream once available. Omit/return null to use the decorative fallback. */
@@ -15,6 +16,12 @@ const STREAM_POLL_ATTEMPTS = 15;
  * mic volume on web (via AnalyserNode on the recorder's own stream); falls
  * back to a lively procedural bounce when no live stream is available
  * (native/Capacitor, or permission not yet granted).
+ *
+ * Uses the app's shared AudioContext (primed from the practice-start button
+ * tap) rather than creating its own - a fresh context created outside a user
+ * gesture is left "suspended" by mobile browsers' autoplay policy, which
+ * silently starves the analyser of data and made the visualizer look dead
+ * on phones.
  */
 export function SoundVisualizer({ getStream }: SoundVisualizerProps) {
   const barRefs = useRef<(HTMLDivElement | null)[]>([]);
@@ -23,7 +30,8 @@ export function SoundVisualizer({ getStream }: SoundVisualizerProps) {
     let raf = 0;
     let cancelled = false;
     let attempts = 0;
-    let audioCtx: AudioContext | null = null;
+    let source: MediaStreamAudioSourceNode | null = null;
+    let analyserNode: AnalyserNode | null = null;
 
     const setBars = (scales: number[]) => {
       scales.forEach((scale, i) => {
@@ -61,17 +69,16 @@ export function SoundVisualizer({ getStream }: SoundVisualizerProps) {
       const stream = getStream?.();
       if (stream && stream.getAudioTracks().length > 0) {
         try {
-          const Ctor =
-            window.AudioContext ??
-            (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-          if (!Ctor) throw new Error("Web Audio unavailable");
-          audioCtx = new Ctor();
-          const source = audioCtx.createMediaStreamSource(stream);
-          const analyser = audioCtx.createAnalyser();
-          analyser.fftSize = 64;
-          analyser.smoothingTimeConstant = 0.6;
-          source.connect(analyser);
-          animateReactive(analyser, new Uint8Array(analyser.frequencyBinCount));
+          const audioCtx = getSharedAudioContext();
+          if (!audioCtx) throw new Error("Web Audio unavailable");
+          if (audioCtx.state === "suspended") void audioCtx.resume();
+
+          source = audioCtx.createMediaStreamSource(stream);
+          analyserNode = audioCtx.createAnalyser();
+          analyserNode.fftSize = 64;
+          analyserNode.smoothingTimeConstant = 0.6;
+          source.connect(analyserNode);
+          animateReactive(analyserNode, new Uint8Array(analyserNode.frequencyBinCount));
           return;
         } catch {
           // Fall through to the decorative animation below.
@@ -90,7 +97,8 @@ export function SoundVisualizer({ getStream }: SoundVisualizerProps) {
     return () => {
       cancelled = true;
       cancelAnimationFrame(raf);
-      void audioCtx?.close();
+      source?.disconnect();
+      analyserNode?.disconnect();
     };
   }, [getStream]);
 

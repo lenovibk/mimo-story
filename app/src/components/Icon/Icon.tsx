@@ -146,6 +146,23 @@ export function IconStarOutline({ className, ...props }: IconProps) {
   );
 }
 
+export function IconCheck({ className, ...props }: IconProps) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={3}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={base(className)}
+      {...props}
+    >
+      <path d="M5 12.5 9.5 17 19 7" />
+    </svg>
+  );
+}
+
 export function IconHeart({ className, ...props }: IconProps) {
   return (
     <svg viewBox="0 0 24 24" fill="currentColor" className={base(className)} {...props}>

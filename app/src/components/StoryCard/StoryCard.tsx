@@ -20,14 +20,15 @@ export const StoryCard = forwardRef<HTMLButtonElement, StoryCardProps>(function 
       ref={ref}
       type="button"
       onClick={() => onSelect(story)}
-      whileTap={{ scale: 1.05 }}
+      whileTap={{ scale: 1.05, rotate: -1.5 }}
+      whileHover={{ rotate: isActive ? [0, -1.5, 1.5, 0] : 0 }}
       animate={{
         scale: isActive ? 1 : 0.9,
         y: isActive ? -8 : 0,
         opacity: isActive ? 1 : 0.7,
       }}
       transition={{ type: "spring", stiffness: 300, damping: 24 }}
-      className={`no-select group relative aspect-[3/4] w-[220px] shrink-0 overflow-hidden rounded-[28px] bg-slate-200 text-left shadow-lg ring-4 sm:w-[240px] ${
+      className={`no-select group relative aspect-[3/4] w-[220px] shrink-0 overflow-hidden rounded-[28px] bg-slate-200 text-left shadow-lg ring-4 sm:w-[240px] landscape-compact:w-[160px] ${
         isActive ? "shadow-black/20 ring-white" : "shadow-black/10 ring-white/70"
       }`}
     >
@@ -71,22 +72,13 @@ export const StoryCard = forwardRef<HTMLButtonElement, StoryCardProps>(function 
         </div>
       )}
 
-      <div className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-2 p-4">
+      <div className="absolute inset-x-0 bottom-0 flex items-end p-4 landscape-compact:p-2.5">
         <div className="font-heading text-white drop-shadow-md">
-          <p className="text-lg leading-tight font-bold">{story.title}</p>
+          <p className="text-lg leading-tight font-bold landscape-compact:text-sm">{story.title}</p>
           {story.episodeLabel && (
-            <p className="text-sm font-semibold text-white/85">{story.episodeLabel}</p>
+            <p className="text-sm font-semibold text-white/85 landscape-compact:text-xs">{story.episodeLabel}</p>
           )}
         </div>
-        <motion.span
-          animate={isActive ? { scale: [1, 1.12, 1] } : { scale: 1 }}
-          transition={{ duration: 1.6, repeat: isActive ? Infinity : 0, ease: "easeInOut" }}
-          className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-white text-[#5CC8FF] shadow-md"
-        >
-          <svg viewBox="0 0 24 24" className="ml-0.5 h-6 w-6 fill-current">
-            <path d="M8 5v14l11-7z" />
-          </svg>
-        </motion.span>
       </div>
     </motion.button>
   );
