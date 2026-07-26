@@ -1,8 +1,8 @@
 import { motion } from "framer-motion";
-import { useMemo } from "react";
+import { useMemo, useRef, useState } from "react";
 import { SolidPillButton } from "@/components/Button/Button";
-import { IconMic, IconPlay, IconStar, IconStarOutline } from "@/components/Icon/Icon";
-import type { StarRating } from "@/types";
+import { IconMic, IconPause, IconPlay, IconStar, IconStarOutline } from "@/components/Icon/Icon";
+import type { StarRating, WordMatch } from "@/types";
 
 const PRAISE = ["Excellent!", "Amazing!", "Great Job!", "Awesome!", "Let's Go!"];
 const CONFETTI_COLORS = ["#5CC8FF", "#FFD54A", "#FF92C2", "#8EE28E", "#FFFFFF"];
@@ -10,12 +10,26 @@ const CONFETTI_COLORS = ["#5CC8FF", "#FFD54A", "#FF92C2", "#8EE28E", "#FFFFFF"];
 interface RewardPopupProps {
   stars: StarRating;
   passed: boolean;
+  words: WordMatch[];
+  audioUrl?: string;
   onContinue: () => void;
   onRetry: () => void;
 }
 
-export function RewardPopup({ stars, passed, onContinue, onRetry }: RewardPopupProps) {
+export function RewardPopup({ stars, passed, words, audioUrl, onContinue, onRetry }: RewardPopupProps) {
   const praise = useMemo(() => PRAISE[Math.floor(Math.random() * PRAISE.length)], []);
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const [playing, setPlaying] = useState(false);
+
+  const togglePlayback = () => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    if (playing) {
+      audio.pause();
+    } else {
+      void audio.play();
+    }
+  };
   const confetti = useMemo(
     () =>
       Array.from({ length: 26 }, (_, i) => ({
@@ -75,6 +89,45 @@ export function RewardPopup({ stars, passed, onContinue, onRetry }: RewardPopupP
           {passed ? praise : "Let's try again!"}
         </p>
 
+        {words.length > 0 && (
+          <div className="flex max-w-sm flex-wrap items-center justify-center gap-1.5">
+            {words.map((w, i) => (
+              <span
+                key={i}
+                className={`rounded-full px-2.5 py-1 font-heading text-sm font-bold ${
+                  w.matched
+                    ? "bg-[#8EE28E]/25 text-[#3F9142]"
+                    : "bg-slate-100 text-slate-400 line-through decoration-2"
+                }`}
+              >
+                {w.word}
+              </span>
+            ))}
+          </div>
+        )}
+
+        {audioUrl && (
+          <button
+            type="button"
+            onClick={togglePlayback}
+            aria-label={playing ? "Pause your recording" : "Play back your recording"}
+            className="flex items-center gap-2 rounded-full bg-[#5CC8FF]/15 py-2 pr-4 pl-2 font-heading text-sm font-bold text-[#2E93C4]"
+          >
+            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#5CC8FF] text-white">
+              {playing ? <IconPause className="h-4 w-4" /> : <IconPlay className="h-4 w-4" />}
+            </span>
+            Hear yourself
+            <audio
+              ref={audioRef}
+              src={audioUrl}
+              onPlay={() => setPlaying(true)}
+              onPause={() => setPlaying(false)}
+              onEnded={() => setPlaying(false)}
+              className="hidden"
+            />
+          </button>
+        )}
+
         {passed ? (
           <>
             <p className="flex items-center gap-1 font-heading text-lg font-bold text-[#FFD54A]">
@@ -88,16 +141,34 @@ export function RewardPopup({ stars, passed, onContinue, onRetry }: RewardPopupP
               onClick={onContinue}
               className="mt-1 px-8 py-4 text-xl"
             />
+            <button
+              type="button"
+              onClick={onRetry}
+              aria-label="Try again"
+              className="font-heading text-sm font-semibold text-slate-400 underline-offset-2 hover:underline"
+            >
+              Try Again
+            </button>
           </>
         ) : (
-          <SolidPillButton
-            label="Try Again"
-            icon={<IconMic className="h-5 w-5" />}
-            color="pink"
-            ariaLabel="Try again"
-            onClick={onRetry}
-            className="mt-1 px-8 py-4 text-xl"
-          />
+          <>
+            <SolidPillButton
+              label="Try Again"
+              icon={<IconMic className="h-5 w-5" />}
+              color="pink"
+              ariaLabel="Try again"
+              onClick={onRetry}
+              className="mt-1 px-8 py-4 text-xl"
+            />
+            <button
+              type="button"
+              onClick={onContinue}
+              aria-label="Skip practice and continue story"
+              className="font-heading text-sm font-semibold text-slate-400 underline-offset-2 hover:underline"
+            >
+              Skip
+            </button>
+          </>
         )}
       </motion.div>
     </motion.div>

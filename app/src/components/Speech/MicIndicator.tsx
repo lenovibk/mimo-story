@@ -1,12 +1,14 @@
 import { motion } from "framer-motion";
 import { IconMic } from "@/components/Icon/Icon";
+import { SoundVisualizer } from "./SoundVisualizer";
 
 interface MicIndicatorProps {
   promptText: string;
+  getStream?: () => MediaStream | null;
 }
 
-/** Pulsing mic + prompt shown while the child is being recorded. */
-export function MicIndicator({ promptText }: MicIndicatorProps) {
+/** Pulsing mic + prompt + sound visualizer shown while the child is being recorded. */
+export function MicIndicator({ promptText, getStream }: MicIndicatorProps) {
   return (
     <div className="absolute inset-0 z-40 flex flex-col items-center justify-center gap-6 bg-black/45 px-6 text-center">
       <p className="max-w-xl font-heading text-2xl font-bold text-white sm:text-3xl">
@@ -22,6 +24,7 @@ export function MicIndicator({ promptText }: MicIndicatorProps) {
           <IconMic className="h-9 w-9" />
         </span>
       </div>
+      <SoundVisualizer getStream={getStream} />
       <p className="font-heading text-lg font-semibold text-white/85">Listening...</p>
     </div>
   );

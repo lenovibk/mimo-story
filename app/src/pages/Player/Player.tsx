@@ -10,13 +10,16 @@ import { MicIndicator } from "@/components/Speech/MicIndicator";
 import { Subtitle } from "@/components/Subtitle/Subtitle";
 import { getStoryById } from "@/data/stories";
 import { findActiveCue, findNearestCue, useSubtitles } from "@/hooks/useSubtitles";
+import { getAudioRecorder } from "@/services/Recording";
 import { getSpeechProvider } from "@/services/Speech";
+import { playReadyChime, primeChimeAudio } from "@/services/Sound/chime";
 import { useAppStore } from "@/store/useAppStore";
 import type { PronunciationResult } from "@/types";
 
 type Phase = "idle" | "countdown" | "listening" | "reward";
 
 const LISTEN_DURATION_MS = 3200;
+const CONTROLS_HIDE_DELAY_MS = 3000;
 
 export function Player() {
   const { id } = useParams<{ id: string }>();
@@ -27,12 +30,15 @@ export function Player() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const listenTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const audioUrlRef = useRef<string | null>(null);
 
   const [currentTime, setCurrentTime] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
   const [phase, setPhase] = useState<Phase>("idle");
   const [result, setResult] = useState<PronunciationResult | null>(null);
   const [practiceTarget, setPracticeTarget] = useState("");
+  const [controlsVisible, setControlsVisible] = useState(true);
+  const hideControlsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const stars = useAppStore((s) => s.stars);
   const subtitleEnOn = useAppStore((s) => s.subtitleEnOn);
@@ -49,10 +55,32 @@ export function Player() {
   useEffect(
     () => () => {
       if (listenTimerRef.current) clearTimeout(listenTimerRef.current);
+      if (hideControlsTimerRef.current) clearTimeout(hideControlsTimerRef.current);
       void getSpeechProvider().cancel();
+      void getAudioRecorder().cancel();
+      if (audioUrlRef.current?.startsWith("blob:")) URL.revokeObjectURL(audioUrlRef.current);
     },
     []
   );
+
+  const scheduleHideControls = () => {
+    if (hideControlsTimerRef.current) clearTimeout(hideControlsTimerRef.current);
+    if (isPaused) return;
+    hideControlsTimerRef.current = setTimeout(() => setControlsVisible(false), CONTROLS_HIDE_DELAY_MS);
+  };
+
+  useEffect(() => {
+    scheduleHideControls();
+    return () => {
+      if (hideControlsTimerRef.current) clearTimeout(hideControlsTimerRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isPaused]);
+
+  const revealControls = () => {
+    setControlsVisible(true);
+    scheduleHideControls();
+  };
 
   if (!story) {
     return (
@@ -91,6 +119,7 @@ export function Player() {
     const target = currentEnCue ?? findNearestCue(en, currentTime);
     if (!target) return;
 
+    primeChimeAudio();
     video.pause();
     setIsPaused(true);
     setPracticeTarget(target.text);
@@ -103,15 +132,24 @@ export function Player() {
       listenTimerRef.current = null;
     }
     const provider = getSpeechProvider();
-    const speechResult = await provider.stop();
+    const recorder = getAudioRecorder();
+    const [speechResult, recording] = await Promise.all([
+      provider.stop(),
+      recorder.stop().catch(() => null),
+    ]);
     const scored = provider.score(practiceTarget, speechResult);
-    setResult(scored);
+
+    if (audioUrlRef.current?.startsWith("blob:")) URL.revokeObjectURL(audioUrlRef.current);
+    audioUrlRef.current = recording?.url ?? null;
+
+    setResult({ ...scored, audioUrl: recording?.url });
     if (scored.passed) addStars(10);
     setPhase("reward");
   };
 
   const handleCountdownComplete = () => {
     setPhase("listening");
+    playReadyChime();
     // Arm the fallback timer immediately - if start() hangs (no mic, no network
     // speech backend, etc.) the child must never be stuck on "Listening..." forever.
     listenTimerRef.current = setTimeout(() => void finishListening(), LISTEN_DURATION_MS);
@@ -119,6 +157,11 @@ export function Player() {
       .start("en-US")
       .catch(() => {
         // No mic / permission denied - the fallback timer above still fires.
+      });
+    getAudioRecorder()
+      .start()
+      .catch(() => {
+        // No mic / permission denied - scoring still works, just no playback.
       });
   };
 
@@ -130,12 +173,18 @@ export function Player() {
   };
 
   const handleRetry = () => {
+    primeChimeAudio();
     setResult(null);
     setPhase("countdown");
   };
 
   return (
-    <div ref={containerRef} className="relative h-svh w-full touch-none overflow-hidden bg-black">
+    <div
+      ref={containerRef}
+      className="relative h-svh w-full touch-none overflow-hidden bg-black"
+      onPointerDown={revealControls}
+      onPointerMove={revealControls}
+    >
       <video
         ref={videoRef}
         src={story.video}
@@ -148,7 +197,11 @@ export function Player() {
         className="h-full w-full object-contain"
       />
 
-      <div className="absolute inset-x-0 top-0 z-20 flex items-center justify-between p-4 sm:p-6">
+      <div
+        className={`absolute inset-x-0 top-0 z-20 flex items-center justify-between p-4 transition-opacity duration-300 sm:p-6 ${
+          controlsVisible ? "opacity-100" : "pointer-events-none opacity-0"
+        }`}
+      >
         <CircleButton
           icon={<IconBack className="h-7 w-7" />}
           color="white"
@@ -187,27 +240,40 @@ export function Player() {
         showVi={subtitleViOn}
       />
 
-      <FloatingButtons
-        subtitleEnOn={subtitleEnOn}
-        subtitleViOn={subtitleViOn}
-        shadowingOn={shadowingOn}
-        isPaused={isPaused}
-        onToggleEn={toggleSubtitleEn}
-        onToggleVi={toggleSubtitleVi}
-        onToggleShadowing={toggleShadowing}
-        onTogglePause={handleTogglePause}
-        onPracticeSpeaking={startPractice}
-        practiceDisabled={phase !== "idle" || loading}
-      />
+      <div
+        className={`transition-opacity duration-300 ${
+          controlsVisible ? "opacity-100" : "pointer-events-none opacity-0"
+        }`}
+      >
+        <FloatingButtons
+          subtitleEnOn={subtitleEnOn}
+          subtitleViOn={subtitleViOn}
+          shadowingOn={shadowingOn}
+          isPaused={isPaused}
+          onToggleEn={toggleSubtitleEn}
+          onToggleVi={toggleSubtitleVi}
+          onToggleShadowing={toggleShadowing}
+          onTogglePause={handleTogglePause}
+          onPracticeSpeaking={startPractice}
+          practiceDisabled={phase !== "idle" || loading}
+        />
+      </div>
 
       {shadowingOn && phase !== "reward" && <CameraPreview boundsRef={containerRef} />}
 
       {phase === "countdown" && <Countdown onComplete={handleCountdownComplete} />}
-      {phase === "listening" && <MicIndicator promptText={practiceTarget} />}
+      {phase === "listening" && (
+        <MicIndicator
+          promptText={practiceTarget}
+          getStream={() => getAudioRecorder().getStream?.() ?? null}
+        />
+      )}
       {phase === "reward" && result && (
         <RewardPopup
           stars={result.stars}
           passed={result.passed}
+          words={result.words}
+          audioUrl={result.audioUrl}
           onContinue={handleRewardContinue}
           onRetry={handleRetry}
         />

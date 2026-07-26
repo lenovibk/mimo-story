@@ -21,7 +21,7 @@ export const useAppStore = create<AppState>()(
 
       subtitleEnOn: true,
       subtitleViOn: true,
-      shadowingOn: true,
+      shadowingOn: false,
       toggleSubtitleEn: () => set((state) => ({ subtitleEnOn: !state.subtitleEnOn })),
       toggleSubtitleVi: () => set((state) => ({ subtitleViOn: !state.subtitleViOn })),
       toggleShadowing: () => set((state) => ({ shadowingOn: !state.shadowingOn })),
