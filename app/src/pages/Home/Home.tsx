@@ -161,23 +161,6 @@ export function Home() {
     playWhoosh(direction);
   };
 
-  // Prev/next arrows stay out of the way until a mouse hovers the rail or a finger taps it,
-  // then auto-hide again so they don't clutter the view (especially on short landscape screens).
-  const [controlsVisible, setControlsVisible] = useState(false);
-  const hideTimerRef = useRef<number | undefined>(undefined);
-
-  const revealControls = () => {
-    setControlsVisible(true);
-    window.clearTimeout(hideTimerRef.current);
-    hideTimerRef.current = window.setTimeout(() => setControlsVisible(false), 2500);
-  };
-  const hideControlsNow = () => {
-    window.clearTimeout(hideTimerRef.current);
-    setControlsVisible(false);
-  };
-
-  useEffect(() => () => window.clearTimeout(hideTimerRef.current), []);
-
   return (
     <div className="relative h-full w-full overflow-hidden">
       <SkyBackground />
@@ -276,18 +259,8 @@ export function Home() {
           </div>
         </motion.div>
 
-        <main
-          className="safe-px relative flex flex-1 items-center py-10 landscape-compact:py-3"
-          onMouseEnter={revealControls}
-          onMouseMove={revealControls}
-          onMouseLeave={hideControlsNow}
-          onTouchStart={revealControls}
-        >
-          <div
-            className={`pointer-events-none absolute inset-0 z-10 transition-opacity duration-300 ${
-              controlsVisible ? "opacity-100 pointer-events-auto" : "opacity-0"
-            }`}
-          >
+        <main className="safe-px relative flex flex-1 items-center py-10 landscape-compact:py-3">
+          <div className="pointer-events-none absolute inset-0 z-10 hidden can-hover:block">
             <CircleButton
               icon={<IconChevronLeft className="h-7 w-7" />}
               color="white"
@@ -295,7 +268,7 @@ export function Home() {
               ariaLabel="Truyện trước"
               onClick={() => goTo(-1)}
               disabled={edge.atStart}
-              className="absolute top-1/2 left-1 -translate-y-1/2"
+              className="pointer-events-auto absolute top-1/2 left-1 -translate-y-1/2"
             />
             <CircleButton
               icon={<IconChevronRight className="h-7 w-7" />}
@@ -304,7 +277,7 @@ export function Home() {
               ariaLabel="Truyện tiếp theo"
               onClick={() => goTo(1)}
               disabled={edge.atEnd}
-              className="absolute top-1/2 right-1 -translate-y-1/2"
+              className="pointer-events-auto absolute top-1/2 right-1 -translate-y-1/2"
             />
           </div>
 

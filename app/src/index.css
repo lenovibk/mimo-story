@@ -3,6 +3,10 @@
 /* Compact layout for short landscape screens (e.g. iPhone rotated sideways). */
 @custom-variant landscape-compact (@media (orientation: landscape) and (max-height: 500px));
 
+/* True desktop/mouse input - excludes touch and stylus-only devices, so hover-only
+   affordances (like rail nav arrows) don't show up as unreachable dead space on mobile. */
+@custom-variant can-hover (@media (hover: hover) and (pointer: fine));
+
 @theme {
   --font-heading: "Baloo 2", "Fredoka", system-ui, sans-serif;
   --font-body: "Nunito", "Fredoka", system-ui, sans-serif;
@@ -68,6 +72,9 @@ body,
 #root {
   height: 100%;
   height: 100dvh;
+  /* iOS can report a stale 100dvh right after a rotation; --app-height (set
+     in main.tsx) tracks the real viewport and wins once it's available. */
+  height: var(--app-height, 100dvh);
 }
 
 /* Pin the document itself so it behaves like a native app screen: nothing to

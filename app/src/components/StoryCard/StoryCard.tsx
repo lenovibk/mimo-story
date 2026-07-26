@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
 import { forwardRef } from "react";
 import type { Story } from "@/types";
+import { formatDuration } from "@/utils/time";
 
 const DEFAULT_COVER = "/stories/default-cover.png";
 
@@ -31,20 +32,17 @@ export const StoryCard = forwardRef<HTMLButtonElement, StoryCardProps>(function 
         isActive ? "shadow-black/20 ring-white" : "shadow-black/10 ring-white/70"
       }`}
     >
-      <picture>
-        {story.coverWebp && <source srcSet={story.coverWebp} type="image/webp" />}
-        <img
-          src={story.cover}
-          alt=""
-          draggable={false}
-          onError={(e) => {
-            const img = e.currentTarget;
-            if (img.src.endsWith(DEFAULT_COVER)) return;
-            img.src = DEFAULT_COVER;
-          }}
-          className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-        />
-      </picture>
+      <img
+        src={story.cover}
+        alt=""
+        draggable={false}
+        onError={(e) => {
+          const img = e.currentTarget;
+          if (img.src.endsWith(DEFAULT_COVER)) return;
+          img.src = DEFAULT_COVER;
+        }}
+        className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+      />
       <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/0 to-black/10" />
 
       {isActive && (
@@ -74,8 +72,12 @@ export const StoryCard = forwardRef<HTMLButtonElement, StoryCardProps>(function 
       <div className="absolute inset-x-0 bottom-0 flex items-end p-4 landscape-compact:p-2.5">
         <div className="font-heading text-white drop-shadow-md">
           <p className="text-lg leading-tight font-bold landscape-compact:text-sm">{story.title}</p>
-          {story.episodeLabel && (
-            <p className="text-sm font-semibold text-white/85 landscape-compact:text-xs">{story.episodeLabel}</p>
+          {(story.episodeLabel || story.duration !== undefined) && (
+            <p className="text-sm font-semibold text-white/85 landscape-compact:text-xs">
+              {story.episodeLabel}
+              {story.episodeLabel && story.duration !== undefined && " • "}
+              {story.duration !== undefined && formatDuration(story.duration)}
+            </p>
           )}
         </div>
       </div>

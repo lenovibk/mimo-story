@@ -22,12 +22,12 @@ export interface Story {
   id: string;
   title: string;
   episodeLabel?: string;
+  /** WebP cover image. */
   cover: string;
-  /** WebP cover, smaller than `cover`. Used when present; `cover` (jpg) stays as fallback. */
-  coverWebp?: string;
+  /** VP9/Opus WebM video. Not playable on iOS/Safari. */
   video: string;
-  /** VP9/Opus WebM, smaller than `video` but unsupported on iOS/Safari. Tried first when present. */
-  videoWebm?: string;
+  /** Runtime in seconds, shown on the story list and as the total in the player's progress readout. */
+  duration?: number;
   subtitleEn: string;
   subtitleVi: string;
   category: StoryCategory;
