@@ -13,10 +13,23 @@ const CLOUDS = [
   { top: "72%", size: 75, duration: 52, delay: -8, opacity: 0.8 },
 ];
 
-/** Shared sky-blue backdrop with drifting clouds + twinkling stars for Splash/Home. */
+/**
+ * Shared illustrated backdrop for Splash/Home: a placeholder scene (sky, hot air
+ * balloon, bird, hills, flowers, fox) plus a few drifting clouds + twinkling stars
+ * layered on top for gentle motion.
+ *
+ * To use your own artwork, replace /public/images/home-bg.png (or .svg) - same
+ * filename, any size - it's rendered edge-to-edge behind everything below.
+ */
 export function SkyBackground() {
   return (
-    <div className="pointer-events-none absolute inset-0 overflow-hidden bg-gradient-to-b from-[#5CC8FF] via-[#8FDBFF] to-[#F7FBFF]">
+    <div className="pointer-events-none absolute inset-0 overflow-hidden bg-[#5CC8FF]">
+      <img
+        src="/images/home-bg.svg"
+        alt=""
+        draggable={false}
+        className="absolute inset-0 h-full w-full object-cover"
+      />
       {CLOUDS.map((cloud, i) => (
         <span
           key={i}

@@ -81,6 +81,8 @@ export function Player() {
   const toggleShadowing = useAppStore((s) => s.toggleShadowing);
   const toggleAutoPlayNext = useAppStore((s) => s.toggleAutoPlayNext);
   const addStars = useAppStore((s) => s.addStars);
+  const setStoryProgress = useAppStore((s) => s.setStoryProgress);
+  const lastProgressSaveRef = useRef(0);
 
   const currentEnCue = useMemo(() => findActiveCue(en, currentTime), [en, currentTime]);
   const currentViCue = useMemo(() => findActiveCue(vi, currentTime), [vi, currentTime]);
@@ -161,7 +163,16 @@ export function Player() {
   }
 
   const handleTimeUpdate = () => {
-    if (videoRef.current) setCurrentTime(videoRef.current.currentTime);
+    const video = videoRef.current;
+    if (!video) return;
+    setCurrentTime(video.currentTime);
+
+    // Persist "continue learning" progress, throttled - this fires many times a second.
+    const now = Date.now();
+    if (story && video.duration > 0 && now - lastProgressSaveRef.current > 3000) {
+      lastProgressSaveRef.current = now;
+      setStoryProgress(story.id, video.currentTime / video.duration);
+    }
   };
 
   const handleLoadedMetadata = () => {
@@ -284,6 +295,7 @@ export function Player() {
   };
 
   const handleVideoEnded = () => {
+    if (story) setStoryProgress(story.id, 1);
     if (autoPlayNext) {
       if (nextStory) navigate(`/story/${nextStory.id}`, { replace: true });
       else navigate("/home");

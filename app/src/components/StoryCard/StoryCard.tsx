@@ -10,10 +10,14 @@ interface StoryCardProps {
   onSelect: (story: Story) => void;
   /** Whether this card is the one currently centered/focused in the rail. */
   isActive?: boolean;
+  /** Watched fraction (0-1). When set, renders a thin progress bar over the cover. */
+  progress?: number;
+  /** Shrinks the card for dense rails (Continue Learning / New Stories). */
+  size?: "default" | "compact";
 }
 
 export const StoryCard = forwardRef<HTMLButtonElement, StoryCardProps>(function StoryCard(
-  { story, onSelect, isActive = true },
+  { story, onSelect, isActive = true, progress, size = "default" },
   ref
 ) {
   return (
@@ -28,9 +32,11 @@ export const StoryCard = forwardRef<HTMLButtonElement, StoryCardProps>(function 
         opacity: isActive ? 1 : 0.7,
       }}
       transition={{ type: "spring", stiffness: 300, damping: 24 }}
-      className={`no-select group relative aspect-[3/4] w-[220px] shrink-0 overflow-hidden rounded-[28px] bg-slate-200 text-left shadow-lg ring-4 sm:w-[240px] landscape-compact:w-[160px] ${
-        isActive ? "shadow-black/20 ring-white" : "shadow-black/10 ring-white/70"
-      }`}
+      className={`no-select group relative aspect-[3/4] shrink-0 overflow-hidden rounded-[28px] bg-slate-200 text-left shadow-lg ring-4 ${
+        size === "compact"
+          ? "w-[148px] sm:w-[168px] landscape-compact:w-[128px]"
+          : "w-[220px] sm:w-[240px] landscape-compact:w-[160px]"
+      } ${isActive ? "shadow-black/20 ring-white" : "shadow-black/10 ring-white/70"}`}
     >
       <img
         src={story.cover}
@@ -69,7 +75,11 @@ export const StoryCard = forwardRef<HTMLButtonElement, StoryCardProps>(function 
         </div>
       )}
 
-      <div className="absolute inset-x-0 bottom-0 flex items-end p-4 landscape-compact:p-2.5">
+      <div
+        className={`absolute inset-x-0 bottom-0 flex items-end p-4 landscape-compact:p-2.5 ${
+          progress !== undefined && progress > 0 ? "pb-[26px]" : ""
+        }`}
+      >
         <div className="font-heading text-white drop-shadow-md">
           <p className="text-lg leading-tight font-bold landscape-compact:text-sm">{story.title}</p>
           {(story.episodeLabel || story.duration !== undefined) && (
@@ -81,6 +91,15 @@ export const StoryCard = forwardRef<HTMLButtonElement, StoryCardProps>(function 
           )}
         </div>
       </div>
+
+      {progress !== undefined && progress > 0 && (
+        <div className="absolute inset-x-3 bottom-3 h-1.5 overflow-hidden rounded-full bg-white/35">
+          <div
+            className="h-full rounded-full bg-[#8EE28E]"
+            style={{ width: `${Math.min(1, progress) * 100}%` }}
+          />
+        </div>
+      )}
     </motion.button>
   );
 });

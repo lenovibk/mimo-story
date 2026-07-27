@@ -1,6 +1,12 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
+interface StoryProgress {
+  /** Watched fraction, 0-1. */
+  ratio: number;
+  updatedAt: number;
+}
+
 interface AppState {
   stars: number;
   addStars: (amount: number) => void;
@@ -14,6 +20,9 @@ interface AppState {
 
   autoPlayNext: boolean;
   toggleAutoPlayNext: () => void;
+
+  storyProgress: Record<string, StoryProgress>;
+  setStoryProgress: (storyId: string, ratio: number) => void;
 }
 
 export const useAppStore = create<AppState>()(
@@ -31,6 +40,15 @@ export const useAppStore = create<AppState>()(
 
       autoPlayNext: false,
       toggleAutoPlayNext: () => set((state) => ({ autoPlayNext: !state.autoPlayNext })),
+
+      storyProgress: {},
+      setStoryProgress: (storyId, ratio) =>
+        set((state) => ({
+          storyProgress: {
+            ...state.storyProgress,
+            [storyId]: { ratio: Math.min(1, Math.max(0, ratio)), updatedAt: Date.now() },
+          },
+        })),
     }),
     { name: "mimokids-app" }
   )

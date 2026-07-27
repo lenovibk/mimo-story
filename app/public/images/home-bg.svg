@@ -1,0 +1,120 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 1400" width="900" height="1400">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#5CC8FF" />
+      <stop offset="45%" stop-color="#8FDBFF" />
+      <stop offset="78%" stop-color="#DFF3FF" />
+      <stop offset="100%" stop-color="#F7FBFF" />
+    </linearGradient>
+    <linearGradient id="hillBack" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#B7EFB0" />
+      <stop offset="100%" stop-color="#9EE79A" />
+    </linearGradient>
+    <linearGradient id="hillFront" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#8EE28E" />
+      <stop offset="100%" stop-color="#6FCB6F" />
+    </linearGradient>
+  </defs>
+
+  <!-- sky -->
+  <rect x="0" y="0" width="900" height="1400" fill="url(#sky)" />
+
+  <!-- sun glow -->
+  <circle cx="770" cy="150" r="150" fill="#FFF3C4" opacity="0.55" />
+  <circle cx="770" cy="150" r="85" fill="#FFEFA8" opacity="0.8" />
+
+  <!-- twinkles -->
+  <g fill="#FFFFFF" opacity="0.85">
+    <path d="M120 90 l8 20 20 8 -20 8 -8 20 -8 -20 -20 -8 20 -8 z" />
+    <path d="M660 300 l6 15 15 6 -15 6 -6 15 -6 -15 -15 -6 15 -6 z" />
+    <path d="M60 420 l5 13 13 5 -13 5 -5 13 -5 -13 -13 -5 13 -5 z" />
+  </g>
+
+  <!-- drifting clouds -->
+  <g fill="#FFFFFF" opacity="0.9">
+    <g transform="translate(90,180)">
+      <ellipse cx="0" cy="0" rx="55" ry="30" />
+      <ellipse cx="45" cy="-14" rx="38" ry="26" />
+      <ellipse cx="-42" cy="10" rx="34" ry="22" />
+    </g>
+    <g transform="translate(560,110)" opacity="0.85">
+      <ellipse cx="0" cy="0" rx="46" ry="24" />
+      <ellipse cx="36" cy="-10" rx="30" ry="20" />
+      <ellipse cx="-34" cy="8" rx="26" ry="18" />
+    </g>
+    <g transform="translate(760,420)" opacity="0.8">
+      <ellipse cx="0" cy="0" rx="50" ry="26" />
+      <ellipse cx="40" cy="-10" rx="32" ry="20" />
+      <ellipse cx="-38" cy="8" rx="28" ry="18" />
+    </g>
+  </g>
+
+  <!-- hot air balloon -->
+  <g transform="translate(430,70) scale(0.8)">
+    <line x1="-24" y1="118" x2="-10" y2="60" stroke="#8A5A34" stroke-width="3" />
+    <line x1="24" y1="118" x2="10" y2="60" stroke="#8A5A34" stroke-width="3" />
+    <path d="M0 -120 C60 -120 68 -20 40 30 C24 58 -24 58 -40 30 C-68 -20 -60 -120 0 -120 Z" fill="#FF92C2" />
+    <path d="M-40 30 C-24 58 24 58 40 30 L38 8 C24 34 -24 34 -38 8 Z" fill="#FFD54A" />
+    <path d="M-15 -119 C-4 -119 4 -119 15 -119 C22 -70 20 -20 12 30 L-12 30 C-20 -20 -22 -70 -15 -119 Z" fill="#FFFFFF" opacity="0.55" />
+    <rect x="-24" y="118" width="48" height="30" rx="7" fill="#B07C4B" />
+    <rect x="-24" y="118" width="48" height="30" rx="7" fill="none" stroke="#8A5A34" stroke-width="2" />
+  </g>
+
+  <!-- bird -->
+  <g transform="translate(660,130) rotate(-8) scale(0.85)">
+    <ellipse cx="0" cy="0" rx="26" ry="18" fill="#FFD54A" />
+    <path d="M-8 -4 C-22 -14 -34 -6 -34 4 C-22 6 -12 2 -8 -4 Z" fill="#FFC22E" />
+    <circle cx="14" cy="-6" r="3" fill="#33415C" />
+    <path d="M24 -2 L36 2 L24 6 Z" fill="#FF8A3D" />
+  </g>
+
+  <!-- back hill -->
+  <path d="M0 1130 C160 1060 300 1180 470 1110 C620 1050 760 1140 900 1080 L900 1400 L0 1400 Z" fill="url(#hillBack)" />
+
+  <!-- front hill -->
+  <path d="M0 1230 C180 1160 340 1260 520 1200 C680 1150 800 1230 900 1190 L900 1400 L0 1400 Z" fill="url(#hillFront)" />
+
+  <!-- flowers along the front hill -->
+  <g>
+    <g transform="translate(120,1225)">
+      <circle cx="0" cy="-10" r="7" fill="#FF92C2" /><circle cx="9" cy="-3" r="7" fill="#FF92C2" />
+      <circle cx="6" cy="8" r="7" fill="#FF92C2" /><circle cx="-6" cy="8" r="7" fill="#FF92C2" />
+      <circle cx="-9" cy="-3" r="7" fill="#FF92C2" /><circle cx="0" cy="0" r="6" fill="#FFD54A" />
+    </g>
+    <g transform="translate(300,1195)">
+      <circle cx="0" cy="-9" r="6" fill="#FFFFFF" /><circle cx="8" cy="-3" r="6" fill="#FFFFFF" />
+      <circle cx="5" cy="7" r="6" fill="#FFFFFF" /><circle cx="-5" cy="7" r="6" fill="#FFFFFF" />
+      <circle cx="-8" cy="-3" r="6" fill="#FFFFFF" /><circle cx="0" cy="0" r="5" fill="#FFD54A" />
+    </g>
+    <g transform="translate(790,1210)">
+      <circle cx="0" cy="-10" r="7" fill="#FF92C2" /><circle cx="9" cy="-3" r="7" fill="#FF92C2" />
+      <circle cx="6" cy="8" r="7" fill="#FF92C2" /><circle cx="-6" cy="8" r="7" fill="#FF92C2" />
+      <circle cx="-9" cy="-3" r="7" fill="#FF92C2" /><circle cx="0" cy="0" r="6" fill="#FFD54A" />
+    </g>
+  </g>
+
+  <!-- butterflies -->
+  <g transform="translate(380,1150) rotate(10)" fill="#B79CFF">
+    <ellipse cx="-9" cy="-6" rx="9" ry="7" /><ellipse cx="9" cy="-6" rx="9" ry="7" />
+    <ellipse cx="-7" cy="7" rx="7" ry="5" /><ellipse cx="7" cy="7" rx="7" ry="5" />
+    <rect x="-1.5" y="-10" width="3" height="20" rx="1.5" fill="#6B5CA5" />
+  </g>
+  <g transform="translate(700,1160) rotate(-14) scale(0.85)" fill="#FF92C2">
+    <ellipse cx="-9" cy="-6" rx="9" ry="7" /><ellipse cx="9" cy="-6" rx="9" ry="7" />
+    <ellipse cx="-7" cy="7" rx="7" ry="5" /><ellipse cx="7" cy="7" rx="7" ry="5" />
+    <rect x="-1.5" y="-10" width="3" height="20" rx="1.5" fill="#C24A85" />
+  </g>
+
+  <!-- fox, bottom-left -->
+  <g transform="translate(70,1330)">
+    <path d="M-70 40 C-40 100 60 100 90 30 C70 -10 -50 -10 -70 40 Z" fill="#F2994A" />
+    <path d="M-40 30 C-20 55 45 55 60 25 C40 5 -25 5 -40 30 Z" fill="#FFF3E4" />
+    <path d="M-55 -20 L-70 -70 L-25 -35 Z" fill="#F2994A" />
+    <path d="M-55 -25 L-63 -55 L-38 -35 Z" fill="#C96A2E" />
+    <path d="M45 -20 L70 -68 L20 -35 Z" fill="#F2994A" />
+    <path d="M45 -25 L60 -54 L30 -34 Z" fill="#C96A2E" />
+    <circle cx="-8" cy="-2" r="4" fill="#33415C" />
+    <circle cx="22" cy="-2" r="4" fill="#33415C" />
+    <ellipse cx="7" cy="12" rx="6" ry="4" fill="#33415C" />
+  </g>
+</svg>

@@ -1,25 +1,162 @@
 import { AnimatePresence, motion } from "framer-motion";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { CircleButton, SolidPillButton } from "@/components/Button/Button";
-import { IconChevronLeft, IconChevronRight, IconHeart, IconSettings, IconStar } from "@/components/Icon/Icon";
+import {
+  IconChevronLeft,
+  IconChevronRight,
+  IconHeart,
+  IconSettings,
+  IconStar,
+} from "@/components/Icon/Icon";
 import { Logo } from "@/components/Logo/Logo";
 import { SkyBackground } from "@/components/SkyBackground/SkyBackground";
 import { StoryCard } from "@/components/StoryCard/StoryCard";
+import { categoryVisuals } from "@/data/categoryVisuals";
 import { stories, storyCategories } from "@/data/stories";
 import { useAppStore } from "@/store/useAppStore";
 import type { Story, StoryCategory } from "@/types";
 import { playTick, playWhoosh } from "@/utils/sound";
 
+/** Fades whichever edge still has more content to scroll to, so a rail never looks
+ * like it just ends mid-list when there's more just out of view. */
+function edgeFadeStyle(atStart: boolean, atEnd: boolean, fade = 28) {
+  const gradient = `linear-gradient(to right, ${atStart ? "black" : "transparent"} 0px, black ${fade}px, black calc(100% - ${fade}px), ${atEnd ? "black" : "transparent"} 100%)`;
+  return { maskImage: gradient, WebkitMaskImage: gradient };
+}
+
+/** Small "there's more" nudge that sits on top of the fade zone - a card peeking a
+ * single pixel through the fade reads as an accident, not an invitation to scroll. */
+function ScrollHint({ side = "right" }: { side?: "left" | "right" }) {
+  return (
+    <span
+      aria-hidden
+      className={`pointer-events-none absolute top-1/2 z-10 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full bg-white/80 text-slate-500 shadow-sm ${
+        side === "right" ? "right-1" : "left-1"
+      }`}
+    >
+      {side === "right" ? <IconChevronRight className="h-4 w-4" /> : <IconChevronLeft className="h-4 w-4" />}
+    </span>
+  );
+}
+
+/** A small round icon button with a caption underneath, for the header actions. */
+function HeaderAction({
+  icon,
+  label,
+  onClick,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <div className="flex flex-col items-center gap-1">
+      <CircleButton icon={icon} color="white" size={52} ariaLabel={label} onClick={onClick} />
+      <span className="font-heading text-xs font-bold text-white drop-shadow-sm">{label}</span>
+    </div>
+  );
+}
+
+/** A horizontally-scrolling row of story cards with a title and a "see more" nudge arrow. */
+function StoryRail({
+  title,
+  emoji,
+  items,
+  onSelect,
+  getProgress,
+}: {
+  title: string;
+  emoji: string;
+  items: Story[];
+  onSelect: (story: Story) => void;
+  getProgress?: (story: Story) => number | undefined;
+}) {
+  const railRef = useRef<HTMLDivElement>(null);
+  const [edge, setEdge] = useState({ atStart: true, atEnd: true });
+  const scrollBy = (dir: 1 | -1) => railRef.current?.scrollBy({ left: dir * 320, behavior: "smooth" });
+
+  const updateEdge = () => {
+    const rail = railRef.current;
+    if (!rail) return;
+    setEdge({
+      atStart: rail.scrollLeft <= 4,
+      atEnd: rail.scrollLeft >= rail.scrollWidth - rail.clientWidth - 4,
+    });
+  };
+
+  useEffect(() => {
+    updateEdge();
+    window.addEventListener("resize", updateEdge);
+    return () => window.removeEventListener("resize", updateEdge);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items]);
+
+  if (items.length === 0) return null;
+
+  return (
+    <section className="pt-8 landscape-compact:pt-4">
+      <div className="safe-px mb-3 flex items-center justify-between">
+        <h2 className="flex items-center gap-2 font-heading text-lg font-bold text-white drop-shadow-sm sm:text-xl">
+          <span aria-hidden>{emoji}</span>
+          {title}
+        </h2>
+        <CircleButton
+          icon={<IconChevronRight className="h-5 w-5" />}
+          color="white"
+          size={40}
+          ariaLabel={`Xem thêm ${title}`}
+          onClick={() => scrollBy(1)}
+          className="hidden can-hover:flex"
+        />
+      </div>
+      <div className="relative">
+        <div
+          ref={railRef}
+          onScroll={updateEdge}
+          className="no-scrollbar safe-px flex gap-4 overflow-x-auto pt-3 pb-2"
+          style={{ scrollSnapType: "x proximity", ...edgeFadeStyle(edge.atStart, edge.atEnd) }}
+        >
+          {items.map((story) => (
+            <div key={story.id} style={{ scrollSnapAlign: "start" }}>
+              <StoryCard
+                story={story}
+                onSelect={onSelect}
+                size="compact"
+                progress={getProgress?.(story)}
+              />
+            </div>
+          ))}
+        </div>
+        {!edge.atEnd && <ScrollHint side="right" />}
+      </div>
+    </section>
+  );
+}
+
 export function Home() {
   const navigate = useNavigate();
   const stars = useAppStore((s) => s.stars);
+  const storyProgress = useAppStore((s) => s.storyProgress);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [category, setCategory] = useState<StoryCategory | null>(null);
 
   const visibleStories = category ? stories.filter((s) => s.category === category) : stories;
 
   const handleSelect = (story: Story) => navigate(`/story/${story.id}`);
+
+  const continueStories = useMemo(() => {
+    return stories
+      .map((story) => ({ story, entry: storyProgress[story.id] }))
+      .filter(
+        (x): x is { story: Story; entry: NonNullable<(typeof storyProgress)[string]> } =>
+          !!x.entry && x.entry.ratio > 0.02 && x.entry.ratio < 0.97
+      )
+      .sort((a, b) => b.entry.updatedAt - a.entry.updatedAt)
+      .slice(0, 12);
+  }, [storyProgress]);
+
+  const newStories = useMemo(() => stories.filter((s) => s.tags?.includes("new")), []);
 
   const railRef = useRef<HTMLDivElement>(null);
   const cardRefs = useRef(new Map<string, HTMLDivElement>());
@@ -110,7 +247,7 @@ export function Home() {
 
   // Click-and-drag scrolling for desktop mice (touch/pen keep native momentum scrolling).
   // Dragging only actually engages once the pointer moves past DRAG_THRESHOLD, so a plain
-  // click never grabs pointer capture or nudges scrollLeft — that's what was swallowing taps.
+  // click never grabs pointer capture or nudges scrollLeft - that's what was swallowing taps.
   const handlePointerDown: React.PointerEventHandler<HTMLDivElement> = (e) => {
     if (e.pointerType !== "mouse") return;
     const rail = railRef.current;
@@ -164,162 +301,172 @@ export function Home() {
   return (
     <div className="relative h-full w-full overflow-hidden">
       <SkyBackground />
-      <div
-        className="absolute inset-x-0 bottom-0 bg-[#8EE28E]/70"
-        style={{
-          height: "calc(7rem + var(--safe-b))",
-          borderRadius: "50% 50% 0 0 / 100% 100% 0 0",
-          transform: "scale(1.4, 1)",
-        }}
-      />
 
-      <div className="relative z-10 flex h-full flex-col">
+      <div className="no-scrollbar relative z-10 h-full overflow-y-auto overscroll-contain">
         <motion.header
           initial={{ opacity: 0, y: -16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, ease: "easeOut" }}
-          className="safe-px safe-pt flex flex-wrap items-center justify-between gap-4 landscape-compact:gap-2"
+          className="safe-px safe-pt flex items-start justify-between gap-4"
         >
           <Logo />
-          <h1 className="order-3 flex w-full items-center justify-center gap-2 text-center font-heading text-xl font-bold text-white drop-shadow-sm sm:order-2 sm:w-auto sm:text-2xl landscape-compact:text-base landscape-compact:gap-1">
-            <IconStar className="h-5 w-5 text-[#FFD54A] sm:h-6 sm:w-6 landscape-compact:h-4 landscape-compact:w-4" />
-            Chọn truyện để bắt đầu
-            <IconStar className="h-5 w-5 text-[#FFD54A] sm:h-6 sm:w-6 landscape-compact:h-4 landscape-compact:w-4" />
-          </h1>
-          <div className="order-2 flex items-center gap-3 sm:order-3">
+          <div className="flex items-center gap-3 sm:gap-4">
             <SolidPillButton
               icon={<IconStar className="h-5 w-5 text-[#FFD54A]" />}
               label={stars}
               color="white"
-              ariaLabel="Stars collected"
-              className="cursor-default"
+              ariaLabel="Số sao đã thu thập"
+              className="cursor-default self-center"
             />
-            <CircleButton
+            <HeaderAction
               icon={<IconSettings className="h-6 w-6" />}
-              color="white"
-              size={56}
-              ariaLabel="Settings"
+              label="Cài đặt"
+              onClick={() => setSettingsOpen(true)}
+            />
+            <HeaderAction
+              icon={<IconHeart className="h-6 w-6" />}
+              label="Giới thiệu"
               onClick={() => setSettingsOpen(true)}
             />
           </div>
         </motion.header>
 
-        <motion.div
-          initial={{ opacity: 0, y: -8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.05, ease: "easeOut" }}
-          className="safe-px pt-4 landscape-compact:pt-2"
-        >
-          <div
-            ref={catRailRef}
-            onScroll={updateCatEdge}
-            className="no-select no-scrollbar flex gap-1.5 overflow-x-auto rounded-full bg-white/15 p-1.5 shadow-inner backdrop-blur-sm"
-            style={{
-              maskImage: `linear-gradient(to right, ${catEdge.atStart ? "black" : "transparent"} 0px, black 20px, black calc(100% - 20px), ${catEdge.atEnd ? "black" : "transparent"} 100%)`,
-              WebkitMaskImage: `linear-gradient(to right, ${catEdge.atStart ? "black" : "transparent"} 0px, black 20px, black calc(100% - 20px), ${catEdge.atEnd ? "black" : "transparent"} 100%)`,
-            }}
-          >
-            <motion.button
-              type="button"
-              whileTap={{ scale: 0.94 }}
-              onClick={() => setCategory(null)}
-              className={`relative shrink-0 rounded-full px-4 py-2 font-heading text-sm font-semibold transition-colors duration-200 ${
-                category === null ? "text-[#5CC8FF]" : "text-white hover:bg-white/15"
-              }`}
+        <StoryRail
+          title="Đang học dở"
+          emoji="⭐"
+          items={continueStories.map((x) => x.story)}
+          onSelect={handleSelect}
+          getProgress={(story) => storyProgress[story.id]?.ratio}
+        />
+
+        <section className="pt-8 pb-6 landscape-compact:pt-4">
+          <div className="safe-px mb-3 flex items-center justify-between">
+            <h2 className="font-heading text-lg font-bold text-white drop-shadow-sm sm:text-xl">
+              📚 Kho truyện{category ? ` · ${storyCategories.find((c) => c.id === category)?.label}` : ""}
+            </h2>
+          </div>
+
+          <div className="relative mb-2">
+            <div
+              ref={catRailRef}
+              onScroll={updateCatEdge}
+              className="no-scrollbar safe-px flex gap-3 overflow-x-auto pt-2 pb-1"
+              style={edgeFadeStyle(catEdge.atStart, catEdge.atEnd, 20)}
             >
-              {category === null && (
-                <motion.span
-                  layoutId="categoryHighlight"
-                  className="absolute inset-0 rounded-full bg-white shadow-md"
-                  transition={{ type: "spring", stiffness: 400, damping: 32 }}
-                />
-              )}
-              <span className="relative z-10">Tất cả</span>
-            </motion.button>
-            {storyCategories.map((c) => (
-              <motion.button
-                key={c.id}
+              <button
                 type="button"
-                whileTap={{ scale: 0.94 }}
-                onClick={() => setCategory(c.id)}
-                className={`relative shrink-0 rounded-full px-4 py-2 font-heading text-sm font-semibold transition-colors duration-200 ${
-                  category === c.id ? "text-[#5CC8FF]" : "text-white hover:bg-white/15"
-                }`}
+                onClick={() => setCategory(null)}
+                className="flex w-[72px] shrink-0 flex-col items-center gap-1.5 sm:w-20"
               >
-                {category === c.id && (
-                  <motion.span
-                    layoutId="categoryHighlight"
-                    className="absolute inset-0 rounded-full bg-white shadow-md"
-                    transition={{ type: "spring", stiffness: 400, damping: 32 }}
-                  />
-                )}
-                <span className="relative z-10">{c.label}</span>
-              </motion.button>
-            ))}
+                <motion.span
+                  whileTap={{ scale: 0.92 }}
+                  className={`flex h-14 w-14 items-center justify-center rounded-full bg-[#B79CFF] text-white shadow-md ring-4 transition-all sm:h-16 sm:w-16 ${
+                    category === null ? "scale-105 ring-white" : "ring-white/40"
+                  }`}
+                >
+                  <IconStar className="h-7 w-7 sm:h-8 sm:w-8" />
+                </motion.span>
+                <span
+                  className={`text-center font-heading text-xs leading-tight font-bold drop-shadow-sm ${
+                    category === null ? "text-[#FFD54A]" : "text-white"
+                  }`}
+                >
+                  Tất cả
+                </span>
+              </button>
+              {storyCategories.map((c) => {
+                const visual = categoryVisuals[c.id];
+                const Icon = visual.icon;
+                const active = category === c.id;
+                return (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => setCategory(c.id)}
+                    className="flex w-[72px] shrink-0 flex-col items-center gap-1.5 sm:w-20"
+                  >
+                    <motion.span
+                      whileTap={{ scale: 0.92 }}
+                      className={`flex h-14 w-14 items-center justify-center rounded-full text-white shadow-md ring-4 transition-all sm:h-16 sm:w-16 ${visual.bg} ${
+                        active ? "scale-105 ring-white" : "ring-white/40"
+                      }`}
+                    >
+                      <Icon className="h-7 w-7 sm:h-8 sm:w-8" />
+                    </motion.span>
+                    <span
+                      className={`text-center font-heading text-xs leading-tight font-bold drop-shadow-sm ${
+                        active ? "text-[#FFD54A]" : "text-white"
+                      }`}
+                    >
+                      {c.label}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+            {!catEdge.atEnd && <ScrollHint side="right" />}
           </div>
-        </motion.div>
 
-        <main className="safe-px relative flex flex-1 items-center py-10 landscape-compact:py-3">
-          <div className="pointer-events-none absolute inset-0 z-10 hidden can-hover:block">
-            <CircleButton
-              icon={<IconChevronLeft className="h-7 w-7" />}
-              color="white"
-              size={56}
-              ariaLabel="Truyện trước"
-              onClick={() => goTo(-1)}
-              disabled={edge.atStart}
-              className="pointer-events-auto absolute top-1/2 left-1 -translate-y-1/2"
-            />
-            <CircleButton
-              icon={<IconChevronRight className="h-7 w-7" />}
-              color="white"
-              size={56}
-              ariaLabel="Truyện tiếp theo"
-              onClick={() => goTo(1)}
-              disabled={edge.atEnd}
-              className="pointer-events-auto absolute top-1/2 right-1 -translate-y-1/2"
-            />
-          </div>
+          <div className="safe-px relative flex items-center py-4 landscape-compact:py-2">
+            <div className="pointer-events-none absolute inset-0 z-10 hidden can-hover:block">
+              <CircleButton
+                icon={<IconChevronLeft className="h-7 w-7" />}
+                color="white"
+                size={56}
+                ariaLabel="Truyện trước"
+                onClick={() => goTo(-1)}
+                disabled={edge.atStart}
+                className="pointer-events-auto absolute top-1/2 left-1 -translate-y-1/2"
+              />
+              <CircleButton
+                icon={<IconChevronRight className="h-7 w-7" />}
+                color="white"
+                size={56}
+                ariaLabel="Truyện tiếp theo"
+                onClick={() => goTo(1)}
+                disabled={edge.atEnd}
+                className="pointer-events-auto absolute top-1/2 right-1 -translate-y-1/2"
+              />
+            </div>
 
-          <div
-            ref={railRef}
-            onScroll={handleScroll}
-            onWheel={handleWheel}
-            onPointerDown={handlePointerDown}
-            onPointerMove={handlePointerMove}
-            onPointerUp={endDrag}
-            onPointerLeave={endDrag}
-            onPointerCancel={endDrag}
-            onClickCapture={handleClickCapture}
-            className={`no-select no-scrollbar flex w-full shrink-0 snap-x snap-proximity gap-5 overflow-x-auto pt-3 pb-4 sm:gap-7 landscape-compact:gap-3 landscape-compact:pt-2 ${
-              isDragging ? "cursor-grabbing" : "cursor-grab"
-            }`}
-            style={{
-              scrollPadding: "0 8px",
-              maskImage: `linear-gradient(to right, ${edge.atStart ? "black" : "transparent"} 0px, black 32px, black calc(100% - 32px), ${edge.atEnd ? "black" : "transparent"} 100%)`,
-              WebkitMaskImage: `linear-gradient(to right, ${edge.atStart ? "black" : "transparent"} 0px, black 32px, black calc(100% - 32px), ${edge.atEnd ? "black" : "transparent"} 100%)`,
-            }}
-          >
-            {visibleStories.map((story) => (
-              <div
-                key={story.id}
-                ref={(el) => {
-                  if (el) cardRefs.current.set(story.id, el);
-                  else cardRefs.current.delete(story.id);
-                }}
-                className="snap-start"
-              >
-                <StoryCard story={story} onSelect={handleSelect} isActive={story.id === activeId} />
-              </div>
-            ))}
+            <div
+              ref={railRef}
+              onScroll={handleScroll}
+              onWheel={handleWheel}
+              onPointerDown={handlePointerDown}
+              onPointerMove={handlePointerMove}
+              onPointerUp={endDrag}
+              onPointerLeave={endDrag}
+              onPointerCancel={endDrag}
+              onClickCapture={handleClickCapture}
+              className={`no-select no-scrollbar flex w-full shrink-0 snap-x snap-proximity gap-5 overflow-x-auto pt-3 pb-4 sm:gap-7 landscape-compact:gap-3 landscape-compact:pt-2 ${
+                isDragging ? "cursor-grabbing" : "cursor-grab"
+              }`}
+              style={{ scrollPadding: "0 8px", ...edgeFadeStyle(edge.atStart, edge.atEnd, 32) }}
+            >
+              {visibleStories.map((story) => (
+                <div
+                  key={story.id}
+                  ref={(el) => {
+                    if (el) cardRefs.current.set(story.id, el);
+                    else cardRefs.current.delete(story.id);
+                  }}
+                  className="snap-start"
+                >
+                  <StoryCard story={story} onSelect={handleSelect} isActive={story.id === activeId} />
+                </div>
+              ))}
+            </div>
           </div>
-        </main>
+        </section>
+
+        <StoryRail title="Truyện mới" emoji="🌸" items={newStories} onSelect={handleSelect} />
 
         <motion.footer
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.1, ease: "easeOut" }}
-          className="safe-pb text-center landscape-compact:hidden"
+          className="safe-pb text-center landscape-compact:pb-4"
         >
           <p className="mx-auto inline-flex items-center gap-2 rounded-full bg-white/85 px-6 py-2 font-heading text-sm font-semibold text-slate-600 shadow-md">
             <IconStar className="h-4 w-4 text-[#FFD54A]" />
