@@ -4,7 +4,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { CircleButton, SolidPillButton } from "@/components/Button/Button";
 import { CameraPreview } from "@/components/CameraPreview/CameraPreview";
 import { FloatingButtons } from "@/components/FloatingButtons/FloatingButtons";
-import { IconBack, IconHome } from "@/components/Icon/Icon";
+import { AnimatedHeart, IconBack, IconHome } from "@/components/Icon/Icon";
 import { ProgressBar } from "@/components/ProgressBar/ProgressBar";
 import { RewardPopup } from "@/components/RewardPopup/RewardPopup";
 import { Countdown } from "@/components/Speech/Countdown";
@@ -13,6 +13,7 @@ import { StoryEndDialog } from "@/components/StoryEndDialog/StoryEndDialog";
 import { Subtitle } from "@/components/Subtitle/Subtitle";
 import { getStoryById, stories } from "@/data/stories";
 import { findActiveCue, findNearestCue, useSubtitles } from "@/hooks/useSubtitles";
+import { api } from "@/services/api";
 import { getAudioRecorder } from "@/services/Recording";
 import {
   playReadyChime,
@@ -22,6 +23,8 @@ import {
 } from "@/services/Sound/feedbackSounds";
 import { getSpeechProvider } from "@/services/Speech";
 import { useAppStore } from "@/store/useAppStore";
+import { useAuthStore } from "@/store/useAuthStore";
+import { useFavoritesStore } from "@/store/useFavoritesStore";
 import type { PronunciationResult } from "@/types";
 import { formatDuration } from "@/utils/time";
 
@@ -82,6 +85,10 @@ export function Player() {
   const toggleAutoPlayNext = useAppStore((s) => s.toggleAutoPlayNext);
   const addStars = useAppStore((s) => s.addStars);
   const setStoryProgress = useAppStore((s) => s.setStoryProgress);
+  const incrementSpeakingAttempts = useAppStore((s) => s.incrementSpeakingAttempts);
+  const activeChildId = useAuthStore((s) => s.activeChildId)!;
+  const isFavorite = useFavoritesStore((s) => s.favoritesByChild[activeChildId]?.includes(story?.id ?? "") ?? false);
+  const toggleFavorite = useFavoritesStore((s) => s.toggleFavorite);
   const lastProgressSaveRef = useRef(0);
 
   const currentEnCue = useMemo(() => findActiveCue(en, currentTime), [en, currentTime]);
@@ -170,8 +177,11 @@ export function Player() {
     // Persist "continue learning" progress, throttled - this fires many times a second.
     const now = Date.now();
     if (story && video.duration > 0 && now - lastProgressSaveRef.current > 3000) {
+      const deltaSeconds = lastProgressSaveRef.current > 0 ? (now - lastProgressSaveRef.current) / 1000 : 0;
       lastProgressSaveRef.current = now;
-      setStoryProgress(story.id, video.currentTime / video.duration);
+      const ratio = video.currentTime / video.duration;
+      setStoryProgress(activeChildId, story.id, ratio);
+      void api.putProgress(activeChildId, story.id, ratio, deltaSeconds).catch(() => {});
     }
   };
 
@@ -248,8 +258,9 @@ export function Player() {
     audioUrlRef.current = recording?.url ?? null;
 
     setResult({ ...scored, audioUrl: recording?.url });
+    incrementSpeakingAttempts(activeChildId);
     if (scored.passed) {
-      addStars(10);
+      addStars(activeChildId, 10);
       playSuccessCheer();
     } else {
       playTryAgainCue();
@@ -295,7 +306,10 @@ export function Player() {
   };
 
   const handleVideoEnded = () => {
-    if (story) setStoryProgress(story.id, 1);
+    if (story) {
+      setStoryProgress(activeChildId, story.id, 1);
+      void api.putProgress(activeChildId, story.id, 1).catch(() => {});
+    }
     if (autoPlayNext) {
       if (nextStory) navigate(`/story/${nextStory.id}`, { replace: true });
       else navigate("/home");
@@ -336,14 +350,24 @@ export function Player() {
         } pt-[max(0.75rem,var(--safe-t))] pb-[max(0.75rem,var(--safe-b))] pr-[max(0.75rem,var(--safe-r))] pl-[max(0.75rem,var(--safe-l))] sm:pt-[max(1.5rem,var(--safe-t))] sm:pb-[max(1.5rem,var(--safe-b))] sm:pr-[max(1.5rem,var(--safe-r))] sm:pl-[max(1.5rem,var(--safe-l))] landscape-compact:pt-[max(0.5rem,var(--safe-t))] landscape-compact:pb-[max(0.5rem,var(--safe-b))] landscape-compact:pr-[max(0.5rem,var(--safe-r))] landscape-compact:pl-[max(0.5rem,var(--safe-l))]`}
       >
         <div className="flex items-center justify-between">
-          <CircleButton
-            icon={<IconBack className="h-6 w-6 sm:h-7 sm:w-7" />}
-            color="white"
-            size={44}
-            className="sm:h-14! sm:w-14! landscape-compact:h-9! landscape-compact:w-9!"
-            ariaLabel="Back to home"
-            onClick={() => navigate("/home")}
-          />
+          <div className="flex items-center gap-2">
+            <CircleButton
+              icon={<IconBack className="h-6 w-6 sm:h-7 sm:w-7" />}
+              color="white"
+              size={44}
+              className="sm:h-14! sm:w-14! landscape-compact:h-9! landscape-compact:w-9!"
+              ariaLabel="Back to home"
+              onClick={() => navigate("/home")}
+            />
+            <CircleButton
+              icon={<AnimatedHeart active={isFavorite} size="h-6 w-6 sm:h-7 sm:w-7" />}
+              color="white"
+              size={44}
+              className="sm:h-14! sm:w-14! landscape-compact:h-9! landscape-compact:w-9!"
+              ariaLabel={isFavorite ? "Bỏ yêu thích" : "Thêm vào yêu thích"}
+              onClick={() => void toggleFavorite(activeChildId, story.id)}
+            />
+          </div>
           <div className="mx-3 hidden min-w-0 flex-1 items-center gap-3 rounded-full bg-white px-5 py-2.5 shadow-md shadow-black/10 sm:flex">
             <span className="shrink-0 truncate font-heading text-sm font-semibold text-[#5CC8FF]">
               {`${story.title}${story.episodeLabel ? ` - ${story.episodeLabel}` : ""}`}

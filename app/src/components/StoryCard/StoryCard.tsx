@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
 import { forwardRef } from "react";
+import { AnimatedHeart } from "@/components/Icon/Icon";
 import type { Story } from "@/types";
 import { formatDuration } from "@/utils/time";
 
@@ -14,10 +15,13 @@ interface StoryCardProps {
   progress?: number;
   /** Shrinks the card for dense rails (Continue Learning / New Stories). */
   size?: "default" | "compact";
+  /** Shows a heart toggle top-left when a handler is provided. */
+  favorite?: boolean;
+  onToggleFavorite?: (story: Story) => void;
 }
 
 export const StoryCard = forwardRef<HTMLButtonElement, StoryCardProps>(function StoryCard(
-  { story, onSelect, isActive = true, progress, size = "default" },
+  { story, onSelect, isActive = true, progress, size = "default", favorite, onToggleFavorite },
   ref
 ) {
   return (
@@ -58,6 +62,22 @@ export const StoryCard = forwardRef<HTMLButtonElement, StoryCardProps>(function 
           animate={{ opacity: 1 }}
           className="pointer-events-none absolute inset-0 rounded-[24px] ring-4 ring-[#FFD54A]/80"
         />
+      )}
+
+      {onToggleFavorite && (
+        <motion.span
+          role="button"
+          tabIndex={0}
+          aria-label={favorite ? "Bỏ yêu thích" : "Thêm vào yêu thích"}
+          whileTap={{ scale: 0.85 }}
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleFavorite(story);
+          }}
+          className="absolute top-3 left-3 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-black/25 text-white backdrop-blur-sm"
+        >
+          <AnimatedHeart active={!!favorite} size="h-4.5 w-4.5" />
+        </motion.span>
       )}
 
       {(story.tags?.includes("new") || story.tags?.includes("featured")) && (

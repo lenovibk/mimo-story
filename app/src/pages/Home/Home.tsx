@@ -5,6 +5,8 @@ import { CircleButton, SolidPillButton } from "@/components/Button/Button";
 import {
   IconChevronLeft,
   IconChevronRight,
+  IconFamily,
+  IconFace,
   IconHeart,
   IconSettings,
   IconStar,
@@ -15,7 +17,10 @@ import { StoryCard } from "@/components/StoryCard/StoryCard";
 import { categoryVisuals } from "@/data/categoryVisuals";
 import { stories, storyCategories } from "@/data/stories";
 import { useAppStore } from "@/store/useAppStore";
+import { useAuthStore } from "@/store/useAuthStore";
+import { useFavoritesStore } from "@/store/useFavoritesStore";
 import type { Story, StoryCategory } from "@/types";
+import { recommendStories } from "@/utils/recommend";
 import { playTick, playWhoosh } from "@/utils/sound";
 
 /** Fades whichever edge still has more content to scroll to, so a rail never looks
@@ -40,21 +45,64 @@ function ScrollHint({ side = "right" }: { side?: "left" | "right" }) {
   );
 }
 
+/** A colorful sticker-badge + bold label used to head every rail/section, so each one reads
+ * as its own distinct "shelf" instead of a plain white heading blending into the next. */
+function SectionTitle({ emoji, title, accent }: { emoji: string; title: string; accent: string }) {
+  return (
+    <h2 className="flex items-center gap-2.5">
+      <motion.span
+        aria-hidden
+        initial={{ scale: 0, rotate: -25 }}
+        whileInView={{ scale: 1, rotate: -8 }}
+        viewport={{ once: true }}
+        transition={{ type: "spring", stiffness: 280, damping: 14 }}
+        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl text-lg shadow-md ring-2 ring-white/70 sm:h-10 sm:w-10 sm:text-xl"
+        style={{ backgroundColor: accent }}
+      >
+        {emoji}
+      </motion.span>
+      <span className="font-heading text-lg font-extrabold tracking-tight text-white drop-shadow-[0_2px_2px_rgba(0,0,0,0.25)] sm:text-xl">
+        {title}
+      </span>
+    </h2>
+  );
+}
+
 /** A small round icon button with a caption underneath, for the header actions. */
-function HeaderAction({
+/** A colorful floating sticker-badge for the header, matching the category chips'
+ * look below - its own bobbing idle animation so the row feels alive, not a static toolbar. */
+function HeaderMenuButton({
   icon,
   label,
+  color,
+  bobDelay = 0,
   onClick,
 }: {
   icon: React.ReactNode;
   label: string;
+  color: string;
+  bobDelay?: number;
   onClick: () => void;
 }) {
   return (
-    <div className="flex flex-col items-center gap-1">
-      <CircleButton icon={icon} color="white" size={52} ariaLabel={label} onClick={onClick} />
-      <span className="font-heading text-xs font-bold text-white drop-shadow-sm">{label}</span>
-    </div>
+    <motion.button
+      type="button"
+      aria-label={label}
+      onClick={onClick}
+      whileTap={{ scale: 0.88, rotate: -6 }}
+      className="no-select flex shrink-0 flex-col items-center gap-1"
+    >
+      <motion.span
+        animate={{ y: [0, -5, 0] }}
+        transition={{ duration: 2.6, repeat: Infinity, delay: bobDelay, ease: "easeInOut" }}
+        whileHover={{ scale: 1.1 }}
+        className="flex h-12 w-12 items-center justify-center rounded-full text-white shadow-md ring-4 ring-white/50 sm:h-14 sm:w-14"
+        style={{ backgroundColor: color }}
+      >
+        {icon}
+      </motion.span>
+      <span className="font-heading text-[10px] font-bold text-white drop-shadow-sm sm:text-xs">{label}</span>
+    </motion.button>
   );
 }
 
@@ -62,15 +110,21 @@ function HeaderAction({
 function StoryRail({
   title,
   emoji,
+  accent,
   items,
   onSelect,
   getProgress,
+  isFavorite,
+  onToggleFavorite,
 }: {
   title: string;
   emoji: string;
+  accent: string;
   items: Story[];
   onSelect: (story: Story) => void;
   getProgress?: (story: Story) => number | undefined;
+  isFavorite?: (story: Story) => boolean;
+  onToggleFavorite?: (story: Story) => void;
 }) {
   const railRef = useRef<HTMLDivElement>(null);
   const [edge, setEdge] = useState({ atStart: true, atEnd: true });
@@ -97,10 +151,7 @@ function StoryRail({
   return (
     <section className="pt-8 landscape-compact:pt-4">
       <div className="safe-px mb-3 flex items-center justify-between">
-        <h2 className="flex items-center gap-2 font-heading text-lg font-bold text-white drop-shadow-sm sm:text-xl">
-          <span aria-hidden>{emoji}</span>
-          {title}
-        </h2>
+        <SectionTitle emoji={emoji} title={title} accent={accent} />
         <CircleButton
           icon={<IconChevronRight className="h-5 w-5" />}
           color="white"
@@ -124,6 +175,8 @@ function StoryRail({
                 onSelect={onSelect}
                 size="compact"
                 progress={getProgress?.(story)}
+                favorite={isFavorite?.(story)}
+                onToggleFavorite={onToggleFavorite}
               />
             </div>
           ))}
@@ -134,16 +187,133 @@ function StoryRail({
   );
 }
 
+// Stable empty fallbacks - a fresh `{}`/`[]` literal inside the selector would give
+// useSyncExternalStore a new reference on every call and loop the render forever.
+const EMPTY_PROGRESS: Record<string, { ratio: number; updatedAt: number }> = {};
+const EMPTY_FAVORITES: string[] = [];
+
+function timeOfDayGreeting(): string {
+  const hour = new Date().getHours();
+  if (hour < 11) return "Chào buổi sáng";
+  if (hour < 14) return "Chào buổi trưa";
+  if (hour < 18) return "Chào buổi chiều";
+  return "Chào buổi tối";
+}
+
+const GREETINGS = [
+  { text: "Hôm nay mình khám phá gì nào?", emoji: "🚀", accent: "#5CC8FF" },
+  { text: "Bạn Mimo đang chờ mình đó!", emoji: "🦊", accent: "#FFB25C" },
+  { text: "Sẵn sàng phiêu lưu chưa nào?", emoji: "🌈", accent: "#B79CFF" },
+  { text: "Cùng học tiếng Anh thật vui nhé!", emoji: "🎈", accent: "#FF92C2" },
+  { text: "Hôm nay là một ngày siêu tuyệt vời!", emoji: "✨", accent: "#FFD54A" },
+  { text: "Xem truyện gì trước nhỉ?", emoji: "🍿", accent: "#8EE28E" },
+];
+
+const GREETING_SPARKLES = [
+  { top: "-10%", left: "6%", delay: 0, size: "text-base" },
+  { top: "-14%", left: "38%", delay: 0.9, size: "text-lg" },
+  { top: "6%", left: "94%", delay: 0.5, size: "text-sm" },
+  { top: "72%", left: "-3%", delay: 1.3, size: "text-base" },
+  { top: "88%", left: "90%", delay: 0.2, size: "text-lg" },
+];
+
+/** A big, colorful, tappable mascot card that greets the active child by name. */
+function HomeGreeting({ name, gender }: { name: string; gender: "boy" | "girl" }) {
+  const greeting = useMemo(() => GREETINGS[Math.floor(Math.random() * GREETINGS.length)], [name]);
+  const [bump, setBump] = useState(0);
+
+  const handleBoop = () => {
+    setBump((n) => n + 1);
+    playTick();
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -18, scale: 0.85 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ type: "spring", stiffness: 260, damping: 16, delay: 0.1 }}
+      className="safe-px relative mt-4"
+    >
+      <div
+        className="relative flex items-center gap-3 overflow-hidden rounded-[28px] py-3 pr-5 pl-3 shadow-lg"
+        style={{ background: `linear-gradient(135deg, ${greeting.accent}, #FF92C2)` }}
+      >
+        {GREETING_SPARKLES.map((s, i) => (
+          <motion.span
+            key={i}
+            aria-hidden
+            className={`pointer-events-none absolute ${s.size} text-white/90 drop-shadow-sm`}
+            style={{ top: s.top, left: s.left }}
+            animate={{ scale: [0.6, 1.2, 0.6], opacity: [0.35, 1, 0.35] }}
+            transition={{ duration: 2.4, repeat: Infinity, delay: s.delay, ease: "easeInOut" }}
+          >
+            ✨
+          </motion.span>
+        ))}
+
+        <motion.button
+          type="button"
+          onClick={handleBoop}
+          aria-label={`Chào ${name}`}
+          animate={{ rotate: [0, -14, 12, -10, 8, 0], y: [0, -4, 0] }}
+          transition={{ duration: 2.2, repeat: Infinity, repeatDelay: 1.4, ease: "easeInOut" }}
+          whileTap={{ scale: 0.82 }}
+          className="relative z-10 flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-white text-4xl shadow-md ring-4 ring-white/50 sm:h-[72px] sm:w-[72px] sm:text-5xl"
+        >
+          <motion.span
+            key={bump}
+            initial={{ scale: 1.7, rotate: -20 }}
+            animate={{ scale: 1, rotate: 0 }}
+            transition={{ type: "spring", stiffness: 420, damping: 12 }}
+          >
+            {gender === "girl" ? "👧" : "👦"}
+          </motion.span>
+        </motion.button>
+
+        <div className="relative z-10 min-w-0">
+          <motion.p
+            initial={{ opacity: 0, x: -10 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.25, ease: "easeOut" }}
+            className="truncate font-heading text-lg font-extrabold text-white drop-shadow-sm sm:text-2xl"
+          >
+            {timeOfDayGreeting()}, {name}! 👋
+          </motion.p>
+          <motion.p
+            initial={{ opacity: 0, x: -10 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.38, ease: "easeOut" }}
+            className="truncate font-body text-xs font-semibold text-white/95 sm:text-base"
+          >
+            {greeting.text} {greeting.emoji}
+          </motion.p>
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
 export function Home() {
   const navigate = useNavigate();
-  const stars = useAppStore((s) => s.stars);
-  const storyProgress = useAppStore((s) => s.storyProgress);
+  const activeChildId = useAuthStore((s) => s.activeChildId)!;
+  const child = useAuthStore((s) => s.children.find((c) => c.id === activeChildId));
+  const stars = useAppStore((s) => s.starsByChild[activeChildId] ?? 0);
+  const storyProgress = useAppStore((s) => s.storyProgressByChild[activeChildId] ?? EMPTY_PROGRESS);
+  const favoriteIds = useFavoritesStore((s) => s.favoritesByChild[activeChildId] ?? EMPTY_FAVORITES);
+  const loadFavorites = useFavoritesStore((s) => s.loadFavorites);
+  const toggleFavorite = useFavoritesStore((s) => s.toggleFavorite);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [category, setCategory] = useState<StoryCategory | null>(null);
+
+  useEffect(() => {
+    loadFavorites(activeChildId).catch(() => {});
+  }, [activeChildId, loadFavorites]);
 
   const visibleStories = category ? stories.filter((s) => s.category === category) : stories;
 
   const handleSelect = (story: Story) => navigate(`/story/${story.id}`);
+  const isFavorite = (story: Story) => favoriteIds.includes(story.id);
+  const handleToggleFavorite = (story: Story) => void toggleFavorite(activeChildId, story.id);
 
   const continueStories = useMemo(() => {
     return stories
@@ -155,6 +325,27 @@ export function Home() {
       .sort((a, b) => b.entry.updatedAt - a.entry.updatedAt)
       .slice(0, 12);
   }, [storyProgress]);
+
+  const recentlyWatchedStories = useMemo(() => {
+    return stories
+      .map((story) => ({ story, entry: storyProgress[story.id] }))
+      .filter(
+        (x): x is { story: Story; entry: NonNullable<(typeof storyProgress)[string]> } => !!x.entry && x.entry.ratio > 0
+      )
+      .sort((a, b) => b.entry.updatedAt - a.entry.updatedAt)
+      .slice(0, 12)
+      .map((x) => x.story);
+  }, [storyProgress]);
+
+  const favoriteStories = useMemo(
+    () => stories.filter((s) => favoriteIds.includes(s.id)),
+    [favoriteIds]
+  );
+
+  const recommendedStories = useMemo(
+    () => (child ? recommendStories(stories, child, storyProgress) : []),
+    [child, storyProgress]
+  );
 
   const newStories = useMemo(() => stories.filter((s) => s.tags?.includes("new")), []);
 
@@ -310,40 +501,71 @@ export function Home() {
           className="safe-px safe-pt flex items-start justify-between gap-4"
         >
           <Logo />
-          <div className="flex items-center gap-3 sm:gap-4">
-            <SolidPillButton
-              icon={<IconStar className="h-5 w-5 text-[#FFD54A]" />}
-              label={stars}
-              color="white"
-              ariaLabel="Số sao đã thu thập"
-              className="cursor-default self-center"
-            />
-            <HeaderAction
+          <div className="flex items-start gap-3 sm:gap-4">
+            <HeaderMenuButton
               icon={<IconSettings className="h-6 w-6" />}
               label="Cài đặt"
+              color="#B79CFF"
+              bobDelay={0}
               onClick={() => setSettingsOpen(true)}
             />
-            <HeaderAction
-              icon={<IconHeart className="h-6 w-6" />}
-              label="Giới thiệu"
-              onClick={() => setSettingsOpen(true)}
+            <HeaderMenuButton
+              icon={<IconFace className="h-6 w-6" />}
+              label="Hồ sơ"
+              color="#FF92C2"
+              bobDelay={0.4}
+              onClick={() => navigate("/profile")}
+            />
+            <HeaderMenuButton
+              icon={<IconFamily className="h-6 w-6" />}
+              label="Phụ huynh"
+              color="#5CC8FF"
+              bobDelay={0.8}
+              onClick={() => navigate("/dashboard")}
             />
           </div>
         </motion.header>
 
+        {child && <HomeGreeting name={child.name} gender={child.gender} />}
+
         <StoryRail
           title="Đang học dở"
           emoji="⭐"
+          accent="#FFD54A"
           items={continueStories.map((x) => x.story)}
           onSelect={handleSelect}
           getProgress={(story) => storyProgress[story.id]?.ratio}
+          isFavorite={isFavorite}
+          onToggleFavorite={handleToggleFavorite}
+        />
+
+        <StoryRail
+          title="Được đề xuất cho bạn"
+          emoji="✨"
+          accent="#B79CFF"
+          items={recommendedStories}
+          onSelect={handleSelect}
+          isFavorite={isFavorite}
+          onToggleFavorite={handleToggleFavorite}
+        />
+
+        <StoryRail
+          title="Yêu thích"
+          emoji="❤️"
+          accent="#FF7A7A"
+          items={favoriteStories}
+          onSelect={handleSelect}
+          isFavorite={isFavorite}
+          onToggleFavorite={handleToggleFavorite}
         />
 
         <section className="pt-8 pb-6 landscape-compact:pt-4">
           <div className="safe-px mb-3 flex items-center justify-between">
-            <h2 className="font-heading text-lg font-bold text-white drop-shadow-sm sm:text-xl">
-              📚 Kho truyện{category ? ` · ${storyCategories.find((c) => c.id === category)?.label}` : ""}
-            </h2>
+            <SectionTitle
+              emoji="📚"
+              title={`Kho truyện${category ? ` · ${storyCategories.find((c) => c.id === category)?.label}` : ""}`}
+              accent="#5CC8FF"
+            />
           </div>
 
           <div className="relative mb-2">
@@ -453,14 +675,38 @@ export function Home() {
                   }}
                   className="snap-start"
                 >
-                  <StoryCard story={story} onSelect={handleSelect} isActive={story.id === activeId} />
+                  <StoryCard
+                    story={story}
+                    onSelect={handleSelect}
+                    isActive={story.id === activeId}
+                    favorite={isFavorite(story)}
+                    onToggleFavorite={handleToggleFavorite}
+                  />
                 </div>
               ))}
             </div>
           </div>
         </section>
 
-        <StoryRail title="Truyện mới" emoji="🌸" items={newStories} onSelect={handleSelect} />
+        <StoryRail
+          title="Xem gần đây"
+          emoji="🕒"
+          accent="#6FE0C8"
+          items={recentlyWatchedStories}
+          onSelect={handleSelect}
+          isFavorite={isFavorite}
+          onToggleFavorite={handleToggleFavorite}
+        />
+
+        <StoryRail
+          title="Truyện mới"
+          emoji="🌸"
+          accent="#FF92C2"
+          items={newStories}
+          onSelect={handleSelect}
+          isFavorite={isFavorite}
+          onToggleFavorite={handleToggleFavorite}
+        />
 
         <motion.footer
           initial={{ opacity: 0, y: 16 }}

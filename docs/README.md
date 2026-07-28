@@ -5,6 +5,7 @@
 | [speech-recording.md](speech-recording.md) | Luồng ghi âm/nhận diện giọng nói/chấm điểm phát âm (Practice Speaking) — kiến trúc, các bug đã gặp/đã sửa, giới hạn còn tồn tại. |
 | [story-pipeline.md](story-pipeline.md) | Quy trình biến video trong `example/stories/` thành truyện trong app — dùng khi có video mới. |
 | [design.md](design.md) | PRD/thiết kế tổng thể của app (bản gốc: `design/design.md`). |
+| [spec-accounts-personalization.md](spec-accounts-personalization.md) | Đề xuất spec tài khoản phụ huynh/cá nhân hóa (auth, wizard, dashboard, admin panel...) — **trái với triết lý "no login" của PRD gốc**, chưa cài đặt. |
 | [app-readme.md](app-readme.md) | README mặc định của template Vite (bản gốc: `app/README.md`). |
 | [ios-capapp-spm-readme.md](ios-capapp-spm-readme.md) | Ghi chú của Capacitor về gói SPM cho iOS (bản gốc: `app/ios/App/CapApp-SPM/README.md`) — chỉ để tham khảo, không chỉnh sửa file gốc. |
 

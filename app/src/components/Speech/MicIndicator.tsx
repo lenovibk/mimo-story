@@ -22,9 +22,13 @@ export function MicIndicator({ promptText, getStream, onStop }: MicIndicatorProp
           transition={{ duration: 1.4, repeat: Infinity, ease: "easeInOut" }}
           className="absolute inset-0 rounded-full bg-[#FF92C2]"
         />
-        <span className="relative flex h-20 w-20 items-center justify-center rounded-full bg-[#FF92C2] text-white shadow-xl">
+        <motion.span
+          animate={{ scale: [1, 1.12, 1] }}
+          transition={{ duration: 1.4, repeat: Infinity, ease: "easeInOut" }}
+          className="relative flex h-20 w-20 items-center justify-center rounded-full bg-[#FF92C2] text-white shadow-xl"
+        >
           <IconMic className="h-9 w-9" />
-        </span>
+        </motion.span>
       </div>
       <SoundVisualizer getStream={getStream} />
       <p className="font-heading text-lg font-semibold text-white/85">Listening...</p>

@@ -867,6 +867,19 @@ export const stories: Story[] = [
     tags: ["new", "featured"],
     accent: "primary",
   },
+  {
+    id: "story070",
+    title: "Fables on Helping & Being Helped",
+    episodeLabel: "Tập 70",
+    cover: "/stories/story070/cover.webp",
+    video: "/stories/story070/video.webm",
+    duration: 452,
+    subtitleEn: "/stories/story070/subtitle_en.srt",
+    subtitleVi: "/stories/story070/subtitle_vi.srt",
+    category: "emotions",
+    tags: ["new"],
+    accent: "yellow",
+  },
 ];
 
 export function getStoryById(id: string): Story | undefined {

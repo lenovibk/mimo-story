@@ -35,6 +35,35 @@ export interface Story {
   accent?: "primary" | "yellow" | "pink" | "green" | "night";
 }
 
+export type Gender = "boy" | "girl";
+
+export interface Parent {
+  id: string;
+  email: string | null;
+  plan: "free" | "premium" | "family";
+  isGuest: boolean;
+}
+
+export interface Child {
+  id: string;
+  name: string;
+  gender: Gender;
+  age: number;
+  avatarKey: string;
+  stars: number;
+  /** Reuses `StoryCategory` ids so recommendation scoring is a direct match. */
+  interests: StoryCategory[];
+}
+
+export interface DashboardStats {
+  stars: number;
+  totalLearningSeconds: number;
+  storiesCompleted: number;
+  favoritesCount: number;
+  weeklyActivity: { date: string; watchedSeconds: number }[];
+  streakDays: number;
+}
+
 export type StarRating = 1 | 2 | 3 | 4 | 5;
 
 export interface WordMatch {

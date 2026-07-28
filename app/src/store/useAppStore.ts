@@ -8,8 +8,9 @@ interface StoryProgress {
 }
 
 interface AppState {
-  stars: number;
-  addStars: (amount: number) => void;
+  // Keyed by childId - each child has their own stars/progress/speaking stats.
+  starsByChild: Record<string, number>;
+  addStars: (childId: string, amount: number) => void;
 
   subtitleEnOn: boolean;
   subtitleViOn: boolean;
@@ -21,15 +22,21 @@ interface AppState {
   autoPlayNext: boolean;
   toggleAutoPlayNext: () => void;
 
-  storyProgress: Record<string, StoryProgress>;
-  setStoryProgress: (storyId: string, ratio: number) => void;
+  storyProgressByChild: Record<string, Record<string, StoryProgress>>;
+  setStoryProgress: (childId: string, storyId: string, ratio: number) => void;
+
+  speakingAttemptsByChild: Record<string, number>;
+  incrementSpeakingAttempts: (childId: string) => void;
 }
 
 export const useAppStore = create<AppState>()(
   persist(
     (set) => ({
-      stars: 0,
-      addStars: (amount) => set((state) => ({ stars: state.stars + amount })),
+      starsByChild: {},
+      addStars: (childId, amount) =>
+        set((state) => ({
+          starsByChild: { ...state.starsByChild, [childId]: (state.starsByChild[childId] ?? 0) + amount },
+        })),
 
       subtitleEnOn: true,
       subtitleViOn: true,
@@ -41,12 +48,24 @@ export const useAppStore = create<AppState>()(
       autoPlayNext: false,
       toggleAutoPlayNext: () => set((state) => ({ autoPlayNext: !state.autoPlayNext })),
 
-      storyProgress: {},
-      setStoryProgress: (storyId, ratio) =>
+      storyProgressByChild: {},
+      setStoryProgress: (childId, storyId, ratio) =>
         set((state) => ({
-          storyProgress: {
-            ...state.storyProgress,
-            [storyId]: { ratio: Math.min(1, Math.max(0, ratio)), updatedAt: Date.now() },
+          storyProgressByChild: {
+            ...state.storyProgressByChild,
+            [childId]: {
+              ...state.storyProgressByChild[childId],
+              [storyId]: { ratio: Math.min(1, Math.max(0, ratio)), updatedAt: Date.now() },
+            },
+          },
+        })),
+
+      speakingAttemptsByChild: {},
+      incrementSpeakingAttempts: (childId) =>
+        set((state) => ({
+          speakingAttemptsByChild: {
+            ...state.speakingAttemptsByChild,
+            [childId]: (state.speakingAttemptsByChild[childId] ?? 0) + 1,
           },
         })),
     }),
