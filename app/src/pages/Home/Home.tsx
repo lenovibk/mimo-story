@@ -1,6 +1,7 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { AdBanner } from "@/components/AdBanner/AdBanner";
 import { CircleButton, SolidPillButton } from "@/components/Button/Button";
 import {
   IconChevronLeft,
@@ -14,10 +15,11 @@ import {
 import { Logo } from "@/components/Logo/Logo";
 import { SkyBackground } from "@/components/SkyBackground/SkyBackground";
 import { StoryCard } from "@/components/StoryCard/StoryCard";
-import { categoryVisuals } from "@/data/categoryVisuals";
-import { stories, storyCategories } from "@/data/stories";
+import { getCategoryIcon } from "@/data/categoryVisuals";
+import { useEnsureCatalogLoaded } from "@/hooks/useEnsureCatalogLoaded";
 import { useAppStore } from "@/store/useAppStore";
 import { useAuthStore } from "@/store/useAuthStore";
+import { useCatalogStore } from "@/store/useCatalogStore";
 import { useFavoritesStore } from "@/store/useFavoritesStore";
 import type { Story, StoryCategory } from "@/types";
 import { recommendStories } from "@/utils/recommend";
@@ -295,6 +297,9 @@ function HomeGreeting({ name, gender }: { name: string; gender: "boy" | "girl" }
 
 export function Home() {
   const navigate = useNavigate();
+  useEnsureCatalogLoaded();
+  const stories = useCatalogStore((s) => s.stories);
+  const storyCategories = useCatalogStore((s) => s.categories);
   const activeChildId = useAuthStore((s) => s.activeChildId)!;
   const child = useAuthStore((s) => s.children.find((c) => c.id === activeChildId));
   const stars = useAppStore((s) => s.starsByChild[activeChildId] ?? 0);
@@ -528,6 +533,8 @@ export function Home() {
 
         {child && <HomeGreeting name={child.name} gender={child.gender} />}
 
+        <AdBanner age={child?.age} />
+
         <StoryRail
           title="Đang học dở"
           emoji="⭐"
@@ -597,8 +604,7 @@ export function Home() {
                 </span>
               </button>
               {storyCategories.map((c) => {
-                const visual = categoryVisuals[c.id];
-                const Icon = visual.icon;
+                const Icon = getCategoryIcon(c.icon);
                 const active = category === c.id;
                 return (
                   <button
@@ -609,7 +615,8 @@ export function Home() {
                   >
                     <motion.span
                       whileTap={{ scale: 0.92 }}
-                      className={`flex h-14 w-14 items-center justify-center rounded-full text-white shadow-md ring-4 transition-all sm:h-16 sm:w-16 ${visual.bg} ${
+                      style={{ backgroundColor: c.color }}
+                      className={`flex h-14 w-14 items-center justify-center rounded-full text-white shadow-md ring-4 transition-all sm:h-16 sm:w-16 ${
                         active ? "scale-105 ring-white" : "ring-white/40"
                       }`}
                     >

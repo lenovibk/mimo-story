@@ -1,5 +1,5 @@
 import { useAuthStore } from "@/store/useAuthStore";
-import type { Child, DashboardStats, Parent } from "@/types";
+import type { Ad, Category, Child, DashboardStats, Parent, Story } from "@/types";
 
 const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3002/api";
 
@@ -82,6 +82,14 @@ export const api = {
   getSubscription: () => request<{ plan: string }>("/parent/subscription"),
 
   setSubscription: (plan: string) => request<{ plan: string }>("/parent/subscription", { method: "POST", body: JSON.stringify({ plan }) }),
+
+  // Catalog - browsing never requires login, so these never send a token.
+  getStories: () => request<Story[]>("/stories"),
+
+  getCategories: () => request<Category[]>("/categories"),
+
+  getActiveAds: (placement = "home_banner", age?: number) =>
+    request<Ad[]>(`/ads/active?placement=${encodeURIComponent(placement)}${age != null ? `&age=${age}` : ""}`),
 };
 
 export { ApiError };

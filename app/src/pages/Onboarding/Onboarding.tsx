@@ -4,11 +4,12 @@ import { useNavigate } from "react-router-dom";
 import { CircleButton, SolidPillButton, type ButtonColor } from "@/components/Button/Button";
 import { IconCheck, IconChevronLeft, IconStar, IconStarOutline } from "@/components/Icon/Icon";
 import { SkyBackground } from "@/components/SkyBackground/SkyBackground";
-import { categoryVisuals } from "@/data/categoryVisuals";
-import { storyCategories } from "@/data/stories";
+import { getCategoryIcon } from "@/data/categoryVisuals";
+import { useEnsureCatalogLoaded } from "@/hooks/useEnsureCatalogLoaded";
 import { useEnsureGuestSession } from "@/hooks/useEnsureGuestSession";
 import { api } from "@/services/api";
 import { useAuthStore } from "@/store/useAuthStore";
+import { useCatalogStore } from "@/store/useCatalogStore";
 import type { Gender, StoryCategory } from "@/types";
 
 const AGES = [3, 4, 5, 6, 7] as const;
@@ -33,6 +34,8 @@ const SPARKLES = [
 export function Onboarding() {
   const navigate = useNavigate();
   const token = useEnsureGuestSession();
+  useEnsureCatalogLoaded();
+  const categories = useCatalogStore((s) => s.categories);
   const children = useAuthStore((s) => s.children);
   const addChild = useAuthStore((s) => s.addChild);
   const setActiveChild = useAuthStore((s) => s.setActiveChild);
@@ -278,9 +281,8 @@ export function Onboarding() {
                   Chọn một hoặc nhiều mục - có thể đổi sau ({interests.length} đã chọn)
                 </p>
                 <div className="grid grid-cols-2 gap-3">
-                  {storyCategories.map((c, i) => {
-                    const visual = categoryVisuals[c.id];
-                    const Icon = visual.icon;
+                  {categories.map((c, i) => {
+                    const Icon = getCategoryIcon(c.icon);
                     const active = interests.includes(c.id);
                     return (
                       <motion.button
@@ -295,8 +297,8 @@ export function Onboarding() {
                           active ? "ring-offset-1" : "ring-transparent"
                         }`}
                         style={{
-                          backgroundColor: active ? `${visual.hex}1A` : "#F8FAFC",
-                          ["--tw-ring-color" as string]: active ? visual.hex : "transparent",
+                          backgroundColor: active ? `${c.color}1A` : "#F8FAFC",
+                          ["--tw-ring-color" as string]: active ? c.color : "transparent",
                         }}
                       >
                         {active && (
@@ -309,7 +311,10 @@ export function Onboarding() {
                             <IconCheck className="h-3 w-3" />
                           </motion.span>
                         )}
-                        <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white shadow-sm ${visual.bg}`}>
+                        <span
+                          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white shadow-sm"
+                          style={{ backgroundColor: c.color }}
+                        >
                           <Icon className="h-5 w-5" />
                         </span>
                         <span className="font-body text-xs font-bold text-slate-600">{c.label}</span>

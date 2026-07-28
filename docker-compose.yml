@@ -6,3 +6,26 @@ services:
     ports:
       - "8986:80"
     restart: unless-stopped
+
+  server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    ports:
+      - "3002:3002"
+    env_file:
+      - ./server/.env
+    volumes:
+      - server_uploads:/app/uploads
+    restart: unless-stopped
+
+  admin:
+    build:
+      context: ./admin
+      dockerfile: Dockerfile
+    ports:
+      - "8987:80"
+    restart: unless-stopped
+
+volumes:
+  server_uploads:

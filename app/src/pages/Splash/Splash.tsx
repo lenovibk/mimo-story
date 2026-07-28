@@ -3,11 +3,13 @@ import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Logo } from "@/components/Logo/Logo";
 import { SkyBackground } from "@/components/SkyBackground/SkyBackground";
+import { useEnsureCatalogLoaded } from "@/hooks/useEnsureCatalogLoaded";
 
 const SPLASH_DURATION_MS = 2000;
 
 export function Splash() {
   const navigate = useNavigate();
+  useEnsureCatalogLoaded();
 
   useEffect(() => {
     const timer = setTimeout(() => navigate("/home", { replace: true }), SPLASH_DURATION_MS);

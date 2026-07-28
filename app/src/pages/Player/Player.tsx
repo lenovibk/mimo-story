@@ -11,7 +11,7 @@ import { Countdown } from "@/components/Speech/Countdown";
 import { MicIndicator } from "@/components/Speech/MicIndicator";
 import { StoryEndDialog } from "@/components/StoryEndDialog/StoryEndDialog";
 import { Subtitle } from "@/components/Subtitle/Subtitle";
-import { getStoryById, stories } from "@/data/stories";
+import { useEnsureCatalogLoaded } from "@/hooks/useEnsureCatalogLoaded";
 import { findActiveCue, findNearestCue, useSubtitles } from "@/hooks/useSubtitles";
 import { api } from "@/services/api";
 import { getAudioRecorder } from "@/services/Recording";
@@ -24,6 +24,7 @@ import {
 import { getSpeechProvider } from "@/services/Speech";
 import { useAppStore } from "@/store/useAppStore";
 import { useAuthStore } from "@/store/useAuthStore";
+import { useCatalogStore } from "@/store/useCatalogStore";
 import { useFavoritesStore } from "@/store/useFavoritesStore";
 import type { PronunciationResult } from "@/types";
 import { formatDuration } from "@/utils/time";
@@ -55,7 +56,10 @@ function getListenDuration(target: string): number {
 export function Player() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const story = id ? getStoryById(id) : undefined;
+  useEnsureCatalogLoaded();
+  const stories = useCatalogStore((s) => s.stories);
+  const catalogLoaded = useCatalogStore((s) => s.loaded);
+  const story = id ? stories.find((s) => s.id === id) : undefined;
   const { en, vi, loading } = useSubtitles(story);
 
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -156,6 +160,9 @@ export function Player() {
   };
 
   if (!story) {
+    // Catalog is still loading (async fetch) - not actually "not found" yet.
+    if (!catalogLoaded) return <div className="h-full w-full bg-black" />;
+
     return (
       <div className="flex h-full flex-col items-center justify-center gap-4 bg-[#F7FBFF] px-6 text-center">
         <p className="font-heading text-2xl font-bold text-slate-600">Không tìm thấy truyện</p>

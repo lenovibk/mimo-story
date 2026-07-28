@@ -90,3 +90,76 @@ model DailyActivity {
 
   @@unique([childId, date])
 }
+
+model AdminUser {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  /// "admin" | "editor"
+  role         String   @default("admin")
+  createdAt    DateTime @default(now())
+}
+
+model Category {
+  id    String @id @default(uuid())
+  /// Stable slug, e.g. "animals" - the app keys its local icon map off this.
+  slug  String @unique
+  label String
+  /// Key into the app's fixed Phosphor icon map (see categoryVisuals.tsx).
+  icon  String
+  /// Hex background color for the category chip, e.g. "#FF92C2".
+  color String
+  order Int    @default(0)
+
+  stories Story[]
+}
+
+model Story {
+  id            String   @id @default(uuid())
+  title         String
+  episodeLabel  String?
+  coverUrl      String
+  videoUrl      String
+  subtitleEnUrl String
+  subtitleViUrl String
+  duration      Int?
+  /// "primary" | "yellow" | "pink" | "green" | "night"
+  accent        String?
+  minAge        Int?
+  maxAge        Int?
+  published     Boolean  @default(true)
+  categoryId    String
+  category      Category @relation(fields: [categoryId], references: [id])
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  tags StoryTagLink[]
+
+  @@index([categoryId])
+}
+
+model StoryTagLink {
+  id      String @id @default(uuid())
+  storyId String
+  story   Story  @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  /// "new" | "featured"
+  tag     String
+
+  @@unique([storyId, tag])
+}
+
+model Ad {
+  id        String    @id @default(uuid())
+  title     String
+  imageUrl  String
+  linkUrl   String?
+  placement String    @default("home_banner")
+  minAge    Int?
+  maxAge    Int?
+  active    Boolean   @default(true)
+  startAt   DateTime?
+  endAt     DateTime?
+  priority  Int       @default(0)
+  createdAt DateTime  @default(now())
+}
+

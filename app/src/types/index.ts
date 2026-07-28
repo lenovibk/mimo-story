@@ -4,19 +4,25 @@ export interface SubtitleItem {
   text: string;
 }
 
-export type StoryCategory =
-  | "animals"
-  | "emotions"
-  | "body"
-  | "family"
-  | "weather"
-  | "holidays"
-  | "school"
-  | "activities"
-  | "food"
-  | "world";
+/**
+ * Category ids now come from the admin-managed catalog (`GET /api/categories`)
+ * instead of a fixed union, so a category slug is just a string. Kept as a
+ * named alias (rather than switching call sites to `string`) so intent stays
+ * clear at usage sites.
+ */
+export type StoryCategory = string;
 
 export type StoryTag = "new" | "featured";
+
+export interface Category {
+  /** The category's slug, e.g. "animals" - doubles as its id. */
+  id: StoryCategory;
+  label: string;
+  /** Key into the app's fixed icon map, see data/categoryVisuals.tsx. */
+  icon: string;
+  /** Hex accent color, e.g. "#FF92C2". */
+  color: string;
+}
 
 export interface Story {
   id: string;
@@ -33,6 +39,17 @@ export interface Story {
   category: StoryCategory;
   tags?: StoryTag[];
   accent?: "primary" | "yellow" | "pink" | "green" | "night";
+  /** Recommended age range set by admin; either bound may be open-ended. */
+  minAge?: number;
+  maxAge?: number;
+}
+
+export interface Ad {
+  id: string;
+  title: string;
+  imageUrl: string;
+  linkUrl?: string;
+  placement: string;
 }
 
 export type Gender = "boy" | "girl";

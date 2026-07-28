@@ -8,12 +8,18 @@ import favoritesRouter from "./routes/favorites.js";
 import progressRouter from "./routes/progress.js";
 import dashboardRouter from "./routes/dashboard.js";
 import subscriptionRouter from "./routes/subscription.js";
+import storiesRouter from "./routes/stories.js";
+import categoriesRouter from "./routes/categories.js";
+import adsRouter from "./routes/ads.js";
+import adminRouter from "./routes/admin/index.js";
+import { uploadDir } from "./services/upload.js";
 
 const app = express();
 
 const allowedOrigins = (process.env.CORS_ORIGINS || "").split(",").map((o) => o.trim()).filter(Boolean);
 app.use(cors({ origin: allowedOrigins.length ? allowedOrigins : true }));
 app.use(express.json());
+app.use("/uploads", express.static(uploadDir));
 
 app.get("/api/health", (_req, res) => res.json({ ok: true }));
 
@@ -23,6 +29,10 @@ app.use("/api/children/:childId/favorites", favoritesRouter);
 app.use("/api/children/:childId/progress", progressRouter);
 app.use("/api/children/:childId/dashboard", dashboardRouter);
 app.use("/api/parent/subscription", subscriptionRouter);
+app.use("/api/stories", storiesRouter);
+app.use("/api/categories", categoriesRouter);
+app.use("/api/ads", adsRouter);
+app.use("/api/admin", adminRouter);
 
 // Catches errors forwarded by asyncHandler so a single failed request (e.g. SMTP
 // misconfigured, DB hiccup) returns a 500 instead of crashing the whole process.
