@@ -5,4 +5,5 @@ ios
 .git
 *.log
 .env
-.env.*
+.env.local
+.env.*.local

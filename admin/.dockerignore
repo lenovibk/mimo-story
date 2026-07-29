@@ -3,4 +3,5 @@ dist
 .git
 *.log
 .env
-.env.*
+.env.local
+.env.*.local

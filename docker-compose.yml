@@ -12,7 +12,7 @@ services:
       context: ./server
       dockerfile: Dockerfile
     ports:
-      - "3002:3002"
+      - "8988:3002"
     env_file:
       - ./server/.env
     volumes:
