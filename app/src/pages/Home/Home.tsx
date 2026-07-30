@@ -705,7 +705,7 @@ export function Home() {
   // Each program gets its own story list up front, so a program with zero stories can be
   // skipped entirely instead of rendering as an empty shelf.
   const programSections = useMemo(
-    () => eligiblePrograms.map((p) => ({ program: p, stories: stories.filter((s) => s.program === p.id) })),
+    () => eligiblePrograms.map((p) => ({ program: p, stories: stories.filter((s) => s.programs.includes(p.id)) })),
     [eligiblePrograms, stories]
   );
 

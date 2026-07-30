@@ -45,9 +45,8 @@ export interface Story {
   categoryId: string;
   categorySlug: string;
   categoryLabel: string;
-  programId: string;
-  programSlug: string;
-  programLabel: string;
+  programIds: string[];
+  programLabels: string[];
   createdAt: string;
   updatedAt: string;
   tags: string[];

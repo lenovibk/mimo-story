@@ -62,7 +62,11 @@ export function AdsList() {
                   <td className="px-4 py-2">
                     <img src={ad.imageUrl} alt="" className="h-10 w-20 rounded object-cover" />
                   </td>
-                  <td className="px-4 py-2 font-medium text-slate-700">{ad.title}</td>
+                  <td className="px-4 py-2">
+                    <Link to={`/ads/${ad.id}`} className="font-medium text-slate-700 hover:text-sky-600 hover:underline">
+                      {ad.title}
+                    </Link>
+                  </td>
                   <td className="px-4 py-2 text-slate-500">{ad.placement}</td>
                   <td className="px-4 py-2 text-slate-500">{ad.minAge != null || ad.maxAge != null ? `${ad.minAge ?? "0"}–${ad.maxAge ?? "∞"}` : "Tất cả"}</td>
                   <td className="px-4 py-2 text-slate-500">{ad.priority}</td>

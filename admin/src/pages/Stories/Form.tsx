@@ -97,7 +97,7 @@ export function StoryForm() {
   const [title, setTitle] = useState("");
   const [episodeLabel, setEpisodeLabel] = useState("");
   const [categoryId, setCategoryId] = useState("");
-  const [programId, setProgramId] = useState("");
+  const [programIds, setProgramIds] = useState<string[]>([]);
   const [mediaType, setMediaType] = useState<(typeof MEDIA_TYPES)[number]>("VIDEO");
   const [duration, setDuration] = useState("");
   const [accent, setAccent] = useState(ACCENTS[0]);
@@ -151,7 +151,7 @@ export function StoryForm() {
     });
     api.getPrograms().then((progs) => {
       setPrograms(progs);
-      setProgramId((prev) => prev || progs[0]?.id || "");
+      setProgramIds((prev) => (prev.length > 0 ? prev : progs[0] ? [progs[0].id] : []));
     });
   }, []);
 
@@ -163,7 +163,7 @@ export function StoryForm() {
       setTitle(s.title);
       setEpisodeLabel(s.episodeLabel ?? "");
       setCategoryId(s.categoryId);
-      setProgramId(s.programId);
+      setProgramIds(s.programIds);
       setMediaType(s.mediaType === "AUDIO" ? "AUDIO" : "VIDEO");
       setDuration(s.duration != null ? String(s.duration) : "");
       setAccent(s.accent ?? ACCENTS[0]);
@@ -175,10 +175,18 @@ export function StoryForm() {
     });
   }, [isEdit, id]);
 
+  const toggleProgram = (id: string) => {
+    setProgramIds((prev) => (prev.includes(id) ? prev.filter((p) => p !== id) : [...prev, id]));
+  };
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError(null);
 
+    if (programIds.length === 0) {
+      setError("Cần chọn ít nhất một chương trình.");
+      return;
+    }
     if (!isEdit && !coverRef.current?.files?.[0]) {
       setError("Cần chọn ảnh bìa.");
       return;
@@ -196,7 +204,7 @@ export function StoryForm() {
     formData.set("title", title.trim());
     formData.set("episodeLabel", episodeLabel.trim());
     formData.set("categoryId", categoryId);
-    formData.set("programId", programId);
+    programIds.forEach((pid) => formData.append("programIds", pid));
     formData.set("mediaType", mediaType);
     formData.set("duration", duration);
     formData.set("accent", accent);
@@ -219,7 +227,7 @@ export function StoryForm() {
       else await api.createStory(formData);
       navigate("/stories");
     } catch {
-      setError("Lưu truyện thất bại.");
+      setError("Lưu bài học thất bại.");
     } finally {
       setSaving(false);
     }
@@ -229,11 +237,11 @@ export function StoryForm() {
 
   return (
     <div className="w-full">
-      <h1 className="mb-6 text-2xl font-bold text-slate-800">{isEdit ? "Sửa truyện" : "Thêm truyện"}</h1>
+      <h1 className="mb-6 text-2xl font-bold text-slate-800">{isEdit ? "Sửa bài học" : "Thêm bài học"}</h1>
 
       <form onSubmit={handleSubmit} className="flex max-w-4xl flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
         <label className="text-sm">
-          <span className="mb-1 block font-medium text-slate-600">Tên truyện</span>
+          <span className="mb-1 block font-medium text-slate-600">Tên bài học</span>
           <input required value={title} onChange={(e) => setTitle(e.target.value)} className="w-full rounded-lg border border-slate-300 px-3 py-2" />
         </label>
 
@@ -255,16 +263,17 @@ export function StoryForm() {
         </div>
 
         <div className="grid grid-cols-2 gap-4">
-          <label className="text-sm">
-            <span className="mb-1 block font-medium text-slate-600">Chương trình</span>
-            <select required value={programId} onChange={(e) => setProgramId(e.target.value)} className="w-full rounded-lg border border-slate-300 px-3 py-2">
+          <div className="text-sm">
+            <span className="mb-1 block font-medium text-slate-600">Chương trình (có thể chọn nhiều)</span>
+            <div className="flex flex-wrap gap-3 rounded-lg border border-slate-300 px-3 py-2">
               {programs.map((p) => (
-                <option key={p.id} value={p.id}>
+                <label key={p.id} className="flex items-center gap-1.5 text-sm">
+                  <input type="checkbox" checked={programIds.includes(p.id)} onChange={() => toggleProgram(p.id)} />
                   {p.label}
-                </option>
+                </label>
               ))}
-            </select>
-          </label>
+            </div>
+          </div>
           <label className="text-sm">
             <span className="mb-1 block font-medium text-slate-600">Loại nội dung</span>
             <select
@@ -386,7 +395,7 @@ export function StoryForm() {
 
         <div className="flex gap-3 pt-2">
           <button type="submit" disabled={saving} className="rounded-lg bg-sky-600 px-5 py-2.5 font-semibold text-white hover:bg-sky-700 disabled:opacity-50">
-            {saving ? "Đang lưu..." : "Lưu truyện"}
+            {saving ? "Đang lưu..." : "Lưu bài học"}
           </button>
           <button type="button" onClick={() => navigate("/stories")} className="rounded-lg border border-slate-300 px-5 py-2.5 font-semibold text-slate-600">
             Huỷ

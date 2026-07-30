@@ -161,7 +161,13 @@ export function ProgramsList() {
                             className="w-full rounded border border-slate-300 px-2 py-1"
                           />
                         ) : (
-                          p.label
+                          <button
+                            type="button"
+                            onClick={() => setEditingId(p.id)}
+                            className="font-medium text-slate-700 hover:text-sky-600 hover:underline"
+                          >
+                            {p.label}
+                          </button>
                         )}
                       </td>
                       <td className="px-4 py-2 text-slate-400">{p.slug}</td>

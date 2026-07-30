@@ -3,7 +3,7 @@ import { useAdminAuthStore } from "@/store/useAdminAuthStore";
 
 const NAV = [
   { to: "/", label: "Tổng quan", end: true },
-  { to: "/stories", label: "Truyện" },
+  { to: "/stories", label: "Bài học" },
   { to: "/categories", label: "Chủ đề" },
   { to: "/programs", label: "Chương trình" },
   { to: "/users", label: "Người dùng" },

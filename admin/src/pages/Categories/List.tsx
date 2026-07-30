@@ -71,7 +71,7 @@ export function CategoriesList() {
       await api.deleteCategory(id);
       load();
     } catch (err) {
-      setError(err instanceof ApiError && err.code === "category_in_use" ? "Chủ đề đang có truyện, không thể xoá." : "Xoá thất bại.");
+      setError(err instanceof ApiError && err.code === "category_in_use" ? "Chủ đề đang có bài học, không thể xoá." : "Xoá thất bại.");
     }
   };
 
@@ -122,7 +122,7 @@ export function CategoriesList() {
                 <th className="px-4 py-3">Icon</th>
                 <th className="px-4 py-3">Màu</th>
                 <th className="px-4 py-3">Thứ tự</th>
-                <th className="px-4 py-3">Số truyện</th>
+                <th className="px-4 py-3">Số bài học</th>
                 <th className="px-4 py-3"></th>
               </tr>
             </thead>
@@ -140,7 +140,13 @@ export function CategoriesList() {
                           className="w-full rounded border border-slate-300 px-2 py-1"
                         />
                       ) : (
-                        c.label
+                        <button
+                          type="button"
+                          onClick={() => setEditingId(c.id)}
+                          className="font-medium text-slate-700 hover:text-sky-600 hover:underline"
+                        >
+                          {c.label}
+                        </button>
                       )}
                     </td>
                     <td className="px-4 py-2 text-slate-400">{c.slug}</td>

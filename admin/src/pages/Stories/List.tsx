@@ -40,7 +40,7 @@ export function StoriesList() {
   }, [search, categoryFilter, programFilter, page]);
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Xoá truyện này? Không thể hoàn tác.")) return;
+    if (!confirm("Xoá bài học này? Không thể hoàn tác.")) return;
     await api.deleteStory(id);
     setStories((prev) => prev.filter((s) => s.id !== id));
     setTotal((t) => t - 1);
@@ -49,9 +49,9 @@ export function StoriesList() {
   return (
     <div>
       <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-slate-800">Truyện</h1>
+        <h1 className="text-2xl font-bold text-slate-800">Bài học</h1>
         <Link to="/stories/new" className="rounded-lg bg-sky-600 px-4 py-2 font-semibold text-white hover:bg-sky-700">
-          + Thêm truyện
+          + Thêm bài học
         </Link>
       </div>
 
@@ -62,7 +62,7 @@ export function StoriesList() {
             setPage(0);
             setSearch(e.target.value);
           }}
-          placeholder="Tìm theo tên truyện..."
+          placeholder="Tìm theo tên bài học..."
           className="w-64 rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-sky-400"
         />
         <select
@@ -106,7 +106,7 @@ export function StoriesList() {
               <thead className="bg-slate-50 text-slate-500">
                 <tr>
                   <th className="px-4 py-3">Ảnh bìa</th>
-                  <th className="px-4 py-3">Tên truyện</th>
+                  <th className="px-4 py-3">Tên bài học</th>
                   <th className="px-4 py-3">Chủ đề</th>
                   <th className="px-4 py-3">Chương trình</th>
                   <th className="px-4 py-3">Tuổi đề xuất</th>
@@ -121,11 +121,13 @@ export function StoriesList() {
                       <img src={s.coverUrl} alt="" className="h-12 w-9 rounded object-cover" />
                     </td>
                     <td className="px-4 py-2">
-                      <p className="font-medium text-slate-700">{s.title}</p>
+                      <Link to={`/stories/${s.id}`} className="font-medium text-slate-700 hover:text-sky-600 hover:underline">
+                        {s.title}
+                      </Link>
                       {s.episodeLabel && <p className="text-xs text-slate-400">{s.episodeLabel}</p>}
                     </td>
                     <td className="px-4 py-2 text-slate-500">{s.categoryLabel}</td>
-                    <td className="px-4 py-2 text-slate-500">{s.programLabel}</td>
+                    <td className="px-4 py-2 text-slate-500">{s.programLabels.join(", ")}</td>
                     <td className="px-4 py-2 text-slate-500">
                       {s.minAge != null || s.maxAge != null ? `${s.minAge ?? "0"}–${s.maxAge ?? "∞"}` : "—"}
                     </td>

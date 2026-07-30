@@ -130,7 +130,7 @@ model Program {
 
   ages       ProgramAgeLink[]
   categories ProgramCategoryLink[]
-  stories    Story[]
+  stories    StoryProgramLink[]
 }
 
 model ProgramAgeLink {
@@ -172,15 +172,23 @@ model Story {
   published     Boolean  @default(true)
   categoryId    String
   category      Category @relation(fields: [categoryId], references: [id])
-  programId     String
-  program       Program  @relation(fields: [programId], references: [id])
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  tags StoryTagLink[]
+  tags     StoryTagLink[]
+  programs StoryProgramLink[]
 
   @@index([categoryId])
-  @@index([programId])
+}
+
+model StoryProgramLink {
+  id        String  @id @default(uuid())
+  storyId   String
+  story     Story   @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  programId String
+  program   Program @relation(fields: [programId], references: [id], onDelete: Cascade)
+
+  @@unique([storyId, programId])
 }
 
 model StoryTagLink {

@@ -55,8 +55,8 @@ export interface Story {
   /** "VIDEO" | "AUDIO" */
   mediaType: string;
   category: StoryCategory;
-  /** Program slug this content belongs to. */
-  program: string;
+  /** Program slugs this content belongs to - a story can be shared across multiple programs. */
+  programs: string[];
   tags?: StoryTag[];
   accent?: "primary" | "yellow" | "pink" | "green" | "night";
   /** Recommended age range set by admin; either bound may be open-ended. */

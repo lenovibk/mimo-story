@@ -11,7 +11,7 @@ router.get(
   asyncHandler(async (_req, res) => {
     const stories = await prisma.story.findMany({
       where: { published: true },
-      include: { category: true, tags: true, program: true },
+      include: { category: true, tags: true, programs: { include: { program: true } } },
       orderBy: { createdAt: "asc" },
     });
 
@@ -28,7 +28,7 @@ router.get(
         mediaType: s.mediaType,
         duration: s.duration ?? undefined,
         category: s.category.slug,
-        program: s.program.slug,
+        programs: s.programs.map((p) => p.program.slug),
         tags: s.tags.map((t) => t.tag),
         accent: s.accent ?? undefined,
         minAge: s.minAge ?? undefined,

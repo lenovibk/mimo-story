@@ -16,7 +16,7 @@ export function Dashboard() {
   }, []);
 
   const cards: { label: string; value: number | undefined }[] = [
-    { label: "Truyện", value: stats?.storyCount },
+    { label: "Bài học", value: stats?.storyCount },
     { label: "Chủ đề", value: stats?.categoryCount },
     { label: "Người dùng", value: stats?.userCount },
     { label: "Quảng cáo đang chạy", value: stats?.activeAdCount },
