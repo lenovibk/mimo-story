@@ -1,5 +1,5 @@
 import { useAdminAuthStore } from "@/store/useAdminAuthStore";
-import type { Ad, AdminUser, Category, Story, UserDetail, UserListItem } from "@/types";
+import type { Ad, AdminUser, Category, Program, Story, UserDetail, UserListItem } from "@/types";
 
 const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3002/api";
 
@@ -56,7 +56,7 @@ export const api = {
   getDashboard: () =>
     request<{ storyCount: number; categoryCount: number; userCount: number; activeAdCount: number }>("/admin/dashboard"),
 
-  getStories: (params: { category?: string; published?: string; search?: string; skip?: number; take?: number } = {}) =>
+  getStories: (params: { category?: string; program?: string; published?: string; search?: string; skip?: number; take?: number } = {}) =>
     request<{ stories: Story[]; total: number }>(`/admin/stories${toQueryString(params)}`),
   getStory: async (id: string) => {
     const { stories } = await request<{ stories: Story[]; total: number }>(`/admin/stories${toQueryString({ take: 200 })}`);
@@ -76,6 +76,17 @@ export const api = {
   updateCategory: (id: string, input: Partial<{ label: string; icon: string; color: string; order: number }>) =>
     request<Category>(`/admin/categories/${id}`, { method: "PATCH", body: JSON.stringify(input) }),
   deleteCategory: (id: string) => request<void>(`/admin/categories/${id}`, { method: "DELETE" }),
+
+  getPrograms: () => request<Program[]>("/admin/programs"),
+  createProgram: (input: { slug?: string; label: string; icon: string; color: string; order?: number; published?: boolean }) =>
+    request<Program>("/admin/programs", { method: "POST", body: JSON.stringify(input) }),
+  updateProgram: (id: string, input: Partial<{ label: string; icon: string; color: string; order: number; published: boolean }>) =>
+    request<Program>(`/admin/programs/${id}`, { method: "PATCH", body: JSON.stringify(input) }),
+  deleteProgram: (id: string) => request<void>(`/admin/programs/${id}`, { method: "DELETE" }),
+  setProgramAges: (id: string, ages: number[]) =>
+    request<{ ages: number[] }>(`/admin/programs/${id}/ages`, { method: "PUT", body: JSON.stringify({ ages }) }),
+  setProgramCategories: (id: string, categoryIds: string[]) =>
+    request<{ categoryIds: string[] }>(`/admin/programs/${id}/categories`, { method: "PUT", body: JSON.stringify({ categoryIds }) }),
 
   getUsers: (params: { search?: string; skip?: number; take?: number } = {}) =>
     request<{ users: UserListItem[]; total: number }>(`/admin/users${toQueryString(params)}`),

@@ -5,19 +5,23 @@ import {
   Book,
   CaretLeft,
   CaretRight,
+  ChatsCircle,
   Check,
   CloudRain,
   DotsNine,
   Gear,
   Globe,
   Hamburger,
+  Headphones,
   Heart,
   House,
   Microphone,
+  MusicNotes,
   Pause,
   PawPrint,
   Play,
   Pulse,
+  Rabbit,
   Smiley,
   SoccerBall,
   Star,
@@ -137,6 +141,23 @@ export function IconGlobe({ className, ...props }: IconProps) {
 
 export function IconPulse({ className, ...props }: IconProps) {
   return <Pulse weight="fill" className={base(className)} {...props} />;
+}
+
+export function IconMusic({ className, ...props }: IconProps) {
+  return <MusicNotes weight="fill" className={base(className)} {...props} />;
+}
+
+export function IconChat({ className, ...props }: IconProps) {
+  return <ChatsCircle weight="fill" className={base(className)} {...props} />;
+}
+
+export function IconHeadphones({ className, ...props }: IconProps) {
+  return <Headphones weight="fill" className={base(className)} {...props} />;
+}
+
+/** Phosphor has no literal fox glyph; Rabbit is the closest cute-critter stand-in for the Little Fox program. */
+export function IconFox({ className, ...props }: IconProps) {
+  return <Rabbit weight="fill" className={base(className)} {...props} />;
 }
 
 export function IconDots({ className, ...props }: IconProps) {

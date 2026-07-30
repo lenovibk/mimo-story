@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { api } from "@/services/api";
-import type { Category, Story } from "@/types";
+import type { Category, Program, Story } from "@/types";
 
 const ACCENTS = ["primary", "yellow", "pink", "green", "night"];
+const MEDIA_TYPES = ["VIDEO", "AUDIO"] as const;
 
 const SUBTITLE_LABEL = { en: "Anh", vi: "Việt" } as const;
 
@@ -88,6 +89,7 @@ export function StoryForm() {
   const navigate = useNavigate();
 
   const [categories, setCategories] = useState<Category[]>([]);
+  const [programs, setPrograms] = useState<Program[]>([]);
   const [loading, setLoading] = useState(isEdit);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -95,6 +97,8 @@ export function StoryForm() {
   const [title, setTitle] = useState("");
   const [episodeLabel, setEpisodeLabel] = useState("");
   const [categoryId, setCategoryId] = useState("");
+  const [programId, setProgramId] = useState("");
+  const [mediaType, setMediaType] = useState<(typeof MEDIA_TYPES)[number]>("VIDEO");
   const [duration, setDuration] = useState("");
   const [accent, setAccent] = useState(ACCENTS[0]);
   const [minAge, setMinAge] = useState("");
@@ -110,6 +114,7 @@ export function StoryForm() {
   const videoRef = useRef<HTMLInputElement>(null);
   const subEnRef = useRef<HTMLInputElement>(null);
   const subViRef = useRef<HTMLInputElement>(null);
+  const audioRef = useRef<HTMLInputElement>(null);
   const coverPreviewRef = useRef<string | null>(null);
   const videoPreviewRef = useRef<string | null>(null);
 
@@ -144,6 +149,10 @@ export function StoryForm() {
       setCategories(cats);
       setCategoryId((prev) => prev || cats[0]?.id || "");
     });
+    api.getPrograms().then((progs) => {
+      setPrograms(progs);
+      setProgramId((prev) => prev || progs[0]?.id || "");
+    });
   }, []);
 
   useEffect(() => {
@@ -154,6 +163,8 @@ export function StoryForm() {
       setTitle(s.title);
       setEpisodeLabel(s.episodeLabel ?? "");
       setCategoryId(s.categoryId);
+      setProgramId(s.programId);
+      setMediaType(s.mediaType === "AUDIO" ? "AUDIO" : "VIDEO");
       setDuration(s.duration != null ? String(s.duration) : "");
       setAccent(s.accent ?? ACCENTS[0]);
       setMinAge(s.minAge != null ? String(s.minAge) : "");
@@ -168,8 +179,16 @@ export function StoryForm() {
     e.preventDefault();
     setError(null);
 
-    if (!isEdit && (!coverRef.current?.files?.[0] || !videoRef.current?.files?.[0] || !subEnRef.current?.files?.[0] || !subViRef.current?.files?.[0])) {
-      setError("Cần đủ 4 file: ảnh bìa, video, phụ đề Anh, phụ đề Việt.");
+    if (!isEdit && !coverRef.current?.files?.[0]) {
+      setError("Cần chọn ảnh bìa.");
+      return;
+    }
+    if (!isEdit && mediaType === "VIDEO" && (!videoRef.current?.files?.[0] || !subEnRef.current?.files?.[0] || !subViRef.current?.files?.[0])) {
+      setError("Cần đủ video, phụ đề Anh, phụ đề Việt.");
+      return;
+    }
+    if (!isEdit && mediaType === "AUDIO" && !audioRef.current?.files?.[0]) {
+      setError("Cần chọn file audio.");
       return;
     }
 
@@ -177,6 +196,8 @@ export function StoryForm() {
     formData.set("title", title.trim());
     formData.set("episodeLabel", episodeLabel.trim());
     formData.set("categoryId", categoryId);
+    formData.set("programId", programId);
+    formData.set("mediaType", mediaType);
     formData.set("duration", duration);
     formData.set("accent", accent);
     formData.set("minAge", minAge);
@@ -184,9 +205,13 @@ export function StoryForm() {
     formData.set("published", String(published));
     formData.set("tags", tags);
     if (coverRef.current?.files?.[0]) formData.set("cover", coverRef.current.files[0]);
-    if (videoRef.current?.files?.[0]) formData.set("video", videoRef.current.files[0]);
-    if (subEnRef.current?.files?.[0]) formData.set("subtitleEn", subEnRef.current.files[0]);
-    if (subViRef.current?.files?.[0]) formData.set("subtitleVi", subViRef.current.files[0]);
+    if (mediaType === "VIDEO") {
+      if (videoRef.current?.files?.[0]) formData.set("video", videoRef.current.files[0]);
+      if (subEnRef.current?.files?.[0]) formData.set("subtitleEn", subEnRef.current.files[0]);
+      if (subViRef.current?.files?.[0]) formData.set("subtitleVi", subViRef.current.files[0]);
+    } else if (audioRef.current?.files?.[0]) {
+      formData.set("audio", audioRef.current.files[0]);
+    }
 
     setSaving(true);
     try {
@@ -223,6 +248,33 @@ export function StoryForm() {
               {categories.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <label className="text-sm">
+            <span className="mb-1 block font-medium text-slate-600">Chương trình</span>
+            <select required value={programId} onChange={(e) => setProgramId(e.target.value)} className="w-full rounded-lg border border-slate-300 px-3 py-2">
+              {programs.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="text-sm">
+            <span className="mb-1 block font-medium text-slate-600">Loại nội dung</span>
+            <select
+              value={mediaType}
+              onChange={(e) => setMediaType(e.target.value as (typeof MEDIA_TYPES)[number])}
+              className="w-full rounded-lg border border-slate-300 px-3 py-2"
+            >
+              {MEDIA_TYPES.map((t) => (
+                <option key={t} value={t}>
+                  {t === "VIDEO" ? "Video" : "Audio"}
                 </option>
               ))}
             </select>
@@ -277,45 +329,57 @@ export function StoryForm() {
               </div>
             )}
           </label>
-          <label className="text-sm">
-            <span className="mb-1 block font-medium text-slate-600">Video (.webm/.mp4){isEdit ? " - để trống nếu giữ nguyên" : ""}</span>
-            <input ref={videoRef} type="file" accept="video/*" className="w-full text-sm" onChange={handleVideoFileChange} />
-            {(videoPreview || existing) && (
-              <div className="mt-2">
-                {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-                <video src={videoPreview ?? existing!.videoUrl} controls className="h-24 w-40 rounded bg-black object-contain" />
-                {videoPreview && <p className="mt-1 text-xs font-medium text-sky-600">Video mới - chưa lưu</p>}
-              </div>
-            )}
-          </label>
-          <label className="text-sm">
-            <span className="mb-1 block font-medium text-slate-600">Phụ đề Anh (.srt){isEdit ? " - để trống nếu giữ nguyên" : ""}</span>
-            <input ref={subEnRef} type="file" accept=".srt" className="w-full text-sm" />
-            {existing && (
-              <div className="mt-1 flex items-center gap-3 text-xs">
-                <a href={existing.subtitleEnUrl} target="_blank" rel="noreferrer" className="text-sky-600 hover:underline">
-                  Xem hiện tại ↗
-                </a>
-                <button type="button" onClick={() => setSubtitleEditorLang("en")} className="font-semibold text-sky-600 hover:underline">
-                  Sửa nhanh
-                </button>
-              </div>
-            )}
-          </label>
-          <label className="text-sm">
-            <span className="mb-1 block font-medium text-slate-600">Phụ đề Việt (.srt){isEdit ? " - để trống nếu giữ nguyên" : ""}</span>
-            <input ref={subViRef} type="file" accept=".srt" className="w-full text-sm" />
-            {existing && (
-              <div className="mt-1 flex items-center gap-3 text-xs">
-                <a href={existing.subtitleViUrl} target="_blank" rel="noreferrer" className="text-sky-600 hover:underline">
-                  Xem hiện tại ↗
-                </a>
-                <button type="button" onClick={() => setSubtitleEditorLang("vi")} className="font-semibold text-sky-600 hover:underline">
-                  Sửa nhanh
-                </button>
-              </div>
-            )}
-          </label>
+          {mediaType === "VIDEO" ? (
+            <>
+              <label className="text-sm">
+                <span className="mb-1 block font-medium text-slate-600">Video (.webm/.mp4){isEdit ? " - để trống nếu giữ nguyên" : ""}</span>
+                <input ref={videoRef} type="file" accept="video/*" className="w-full text-sm" onChange={handleVideoFileChange} />
+                {(videoPreview || existing?.videoUrl) && (
+                  <div className="mt-2">
+                    {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+                    <video src={videoPreview ?? existing!.videoUrl!} controls className="h-24 w-40 rounded bg-black object-contain" />
+                    {videoPreview && <p className="mt-1 text-xs font-medium text-sky-600">Video mới - chưa lưu</p>}
+                  </div>
+                )}
+              </label>
+              <label className="text-sm">
+                <span className="mb-1 block font-medium text-slate-600">Phụ đề Anh (.srt){isEdit ? " - để trống nếu giữ nguyên" : ""}</span>
+                <input ref={subEnRef} type="file" accept=".srt" className="w-full text-sm" />
+                {existing?.subtitleEnUrl && (
+                  <div className="mt-1 flex items-center gap-3 text-xs">
+                    <a href={existing.subtitleEnUrl} target="_blank" rel="noreferrer" className="text-sky-600 hover:underline">
+                      Xem hiện tại ↗
+                    </a>
+                    <button type="button" onClick={() => setSubtitleEditorLang("en")} className="font-semibold text-sky-600 hover:underline">
+                      Sửa nhanh
+                    </button>
+                  </div>
+                )}
+              </label>
+              <label className="text-sm">
+                <span className="mb-1 block font-medium text-slate-600">Phụ đề Việt (.srt){isEdit ? " - để trống nếu giữ nguyên" : ""}</span>
+                <input ref={subViRef} type="file" accept=".srt" className="w-full text-sm" />
+                {existing?.subtitleViUrl && (
+                  <div className="mt-1 flex items-center gap-3 text-xs">
+                    <a href={existing.subtitleViUrl} target="_blank" rel="noreferrer" className="text-sky-600 hover:underline">
+                      Xem hiện tại ↗
+                    </a>
+                    <button type="button" onClick={() => setSubtitleEditorLang("vi")} className="font-semibold text-sky-600 hover:underline">
+                      Sửa nhanh
+                    </button>
+                  </div>
+                )}
+              </label>
+            </>
+          ) : (
+            <label className="text-sm">
+              <span className="mb-1 block font-medium text-slate-600">Audio (.mp3){isEdit ? " - để trống nếu giữ nguyên" : ""}</span>
+              <input ref={audioRef} type="file" accept="audio/*" className="w-full text-sm" />
+              {existing?.audioUrl && (
+                <audio src={existing.audioUrl} controls className="mt-2 h-10 w-full" />
+              )}
+            </label>
+          )}
         </div>
 
         {error && <p className="text-sm text-red-600">{error}</p>}

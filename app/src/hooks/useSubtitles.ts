@@ -19,7 +19,10 @@ export function useSubtitles(story: Story | undefined): SubtitleState {
     let cancelled = false;
     setState((prev) => ({ ...prev, loading: true }));
 
-    Promise.all([loadSrt(story.subtitleEn), loadSrt(story.subtitleVi)]).then(([en, vi]) => {
+    Promise.all([
+      story.subtitleEn ? loadSrt(story.subtitleEn) : Promise.resolve([]),
+      story.subtitleVi ? loadSrt(story.subtitleVi) : Promise.resolve([]),
+    ]).then(([en, vi]) => {
       if (cancelled) return;
       setState({ en, vi, loading: false });
     });

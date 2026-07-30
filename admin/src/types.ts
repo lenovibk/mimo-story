@@ -14,14 +14,29 @@ export interface Category {
   storyCount: number;
 }
 
+export interface Program {
+  id: string;
+  slug: string;
+  label: string;
+  icon: string;
+  color: string;
+  order: number;
+  published: boolean;
+  storyCount: number;
+  ages: number[];
+  categoryIds: string[];
+}
+
 export interface Story {
   id: string;
   title: string;
   episodeLabel: string | null;
   coverUrl: string;
-  videoUrl: string;
-  subtitleEnUrl: string;
-  subtitleViUrl: string;
+  videoUrl: string | null;
+  subtitleEnUrl: string | null;
+  subtitleViUrl: string | null;
+  audioUrl: string | null;
+  mediaType: string;
   duration: number | null;
   accent: string | null;
   minAge: number | null;
@@ -30,6 +45,9 @@ export interface Story {
   categoryId: string;
   categorySlug: string;
   categoryLabel: string;
+  programId: string;
+  programSlug: string;
+  programLabel: string;
   createdAt: string;
   updatedAt: string;
   tags: string[];

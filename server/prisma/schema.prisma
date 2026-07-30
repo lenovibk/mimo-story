@@ -111,7 +111,46 @@ model Category {
   color String
   order Int    @default(0)
 
-  stories Story[]
+  stories      Story[]
+  programLinks ProgramCategoryLink[]
+}
+
+model Program {
+  id        String   @id @default(uuid())
+  /// Stable slug, e.g. "truyen" - the public API's "id" field, mirrors Category.
+  slug      String   @unique
+  label     String
+  /// Key into the app's fixed program icon map (see programVisuals.tsx).
+  icon      String
+  color     String
+  order     Int      @default(0)
+  /// False while a program has no real content yet - hidden from the public API/app,
+  /// still fully manageable in admin. Mirrors Story.published / Ad.active.
+  published Boolean  @default(true)
+
+  ages       ProgramAgeLink[]
+  categories ProgramCategoryLink[]
+  stories    Story[]
+}
+
+model ProgramAgeLink {
+  id        String  @id @default(uuid())
+  programId String
+  program   Program @relation(fields: [programId], references: [id], onDelete: Cascade)
+  /// One of 3,4,5,6,7 ("7+"), matching Onboarding's fixed AGES picker exactly.
+  age       Int
+
+  @@unique([programId, age])
+}
+
+model ProgramCategoryLink {
+  id         String   @id @default(uuid())
+  programId  String
+  program    Program  @relation(fields: [programId], references: [id], onDelete: Cascade)
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@unique([programId, categoryId])
 }
 
 model Story {
@@ -119,9 +158,12 @@ model Story {
   title         String
   episodeLabel  String?
   coverUrl      String
-  videoUrl      String
-  subtitleEnUrl String
-  subtitleViUrl String
+  videoUrl      String?
+  subtitleEnUrl String?
+  subtitleViUrl String?
+  audioUrl      String?
+  /// "VIDEO" | "AUDIO"
+  mediaType     String   @default("VIDEO")
   duration      Int?
   /// "primary" | "yellow" | "pink" | "green" | "night"
   accent        String?
@@ -130,12 +172,15 @@ model Story {
   published     Boolean  @default(true)
   categoryId    String
   category      Category @relation(fields: [categoryId], references: [id])
+  programId     String
+  program       Program  @relation(fields: [programId], references: [id])
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
   tags StoryTagLink[]
 
   @@index([categoryId])
+  @@index([programId])
 }
 
 model StoryTagLink {

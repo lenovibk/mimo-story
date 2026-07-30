@@ -1,5 +1,5 @@
 import { useAuthStore } from "@/store/useAuthStore";
-import type { Ad, Category, Child, DashboardStats, Parent, Story } from "@/types";
+import type { Ad, Category, Child, DashboardStats, Parent, Program, Story } from "@/types";
 
 const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3002/api";
 
@@ -87,6 +87,8 @@ export const api = {
   getStories: () => request<Story[]>("/stories"),
 
   getCategories: () => request<Category[]>("/categories"),
+
+  getPrograms: () => request<Program[]>("/programs"),
 
   getActiveAds: (placement = "home_banner", age?: number) =>
     request<Ad[]>(`/ads/active?placement=${encodeURIComponent(placement)}${age != null ? `&age=${age}` : ""}`),

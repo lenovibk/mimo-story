@@ -10,6 +10,7 @@ import dashboardRouter from "./routes/dashboard.js";
 import subscriptionRouter from "./routes/subscription.js";
 import storiesRouter from "./routes/stories.js";
 import categoriesRouter from "./routes/categories.js";
+import programsRouter from "./routes/programs.js";
 import adsRouter from "./routes/ads.js";
 import adminRouter from "./routes/admin/index.js";
 import { uploadDir } from "./services/upload.js";
@@ -31,6 +32,7 @@ app.use("/api/children/:childId/dashboard", dashboardRouter);
 app.use("/api/parent/subscription", subscriptionRouter);
 app.use("/api/stories", storiesRouter);
 app.use("/api/categories", categoriesRouter);
+app.use("/api/programs", programsRouter);
 app.use("/api/ads", adsRouter);
 app.use("/api/admin", adminRouter);
 

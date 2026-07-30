@@ -11,9 +11,11 @@ function serializeStory(story: {
   title: string;
   episodeLabel: string | null;
   coverUrl: string;
-  videoUrl: string;
-  subtitleEnUrl: string;
-  subtitleViUrl: string;
+  videoUrl: string | null;
+  subtitleEnUrl: string | null;
+  subtitleViUrl: string | null;
+  audioUrl: string | null;
+  mediaType: string;
   duration: number | null;
   accent: string | null;
   minAge: number | null;
@@ -21,6 +23,8 @@ function serializeStory(story: {
   published: boolean;
   categoryId: string;
   category: { slug: string; label: string };
+  programId: string;
+  program: { slug: string; label: string };
   createdAt: Date;
   updatedAt: Date;
   tags: { tag: string }[];
@@ -30,9 +34,11 @@ function serializeStory(story: {
     title: story.title,
     episodeLabel: story.episodeLabel,
     coverUrl: resolveAssetUrl(story.coverUrl),
-    videoUrl: resolveAssetUrl(story.videoUrl),
-    subtitleEnUrl: resolveAssetUrl(story.subtitleEnUrl),
-    subtitleViUrl: resolveAssetUrl(story.subtitleViUrl),
+    videoUrl: story.videoUrl ? resolveAssetUrl(story.videoUrl) : null,
+    subtitleEnUrl: story.subtitleEnUrl ? resolveAssetUrl(story.subtitleEnUrl) : null,
+    subtitleViUrl: story.subtitleViUrl ? resolveAssetUrl(story.subtitleViUrl) : null,
+    audioUrl: story.audioUrl ? resolveAssetUrl(story.audioUrl) : null,
+    mediaType: story.mediaType,
     duration: story.duration,
     accent: story.accent,
     minAge: story.minAge,
@@ -41,6 +47,9 @@ function serializeStory(story: {
     categoryId: story.categoryId,
     categorySlug: story.category.slug,
     categoryLabel: story.category.label,
+    programId: story.programId,
+    programSlug: story.program.slug,
+    programLabel: story.program.label,
     createdAt: story.createdAt,
     updatedAt: story.updatedAt,
     tags: story.tags.map((t) => t.tag),
@@ -63,12 +72,13 @@ function parseNullableInt(input: unknown): number | null | undefined {
 router.get(
   "/",
   asyncHandler(async (req, res) => {
-    const { category, published, search } = req.query;
+    const { category, program, published, search } = req.query;
     const take = Math.min(Number(req.query.take) || 50, 200);
     const skip = Number(req.query.skip) || 0;
 
     const where = {
       ...(typeof category === "string" && category ? { category: { slug: category } } : {}),
+      ...(typeof program === "string" && program ? { program: { slug: program } } : {}),
       ...(published === "true" ? { published: true } : published === "false" ? { published: false } : {}),
       ...(typeof search === "string" && search ? { title: { contains: search } } : {}),
     };
@@ -76,7 +86,7 @@ router.get(
     const [stories, total] = await Promise.all([
       prisma.story.findMany({
         where,
-        include: { category: true, tags: true },
+        include: { category: true, tags: true, program: true },
         orderBy: { createdAt: "desc" },
         take,
         skip,
@@ -97,30 +107,59 @@ router.post(
     const video = files?.video?.[0];
     const subtitleEn = files?.subtitleEn?.[0];
     const subtitleVi = files?.subtitleVi?.[0];
+    const audio = files?.audio?.[0];
 
-    const { title, episodeLabel, categoryId, accent } = req.body ?? {};
+    const { title, episodeLabel, categoryId, programId, accent } = req.body ?? {};
+    const mediaType = req.body?.mediaType === "AUDIO" ? "AUDIO" : "VIDEO";
 
-    if (typeof title !== "string" || !title.trim() || typeof categoryId !== "string" || !categoryId) {
+    if (
+      typeof title !== "string" ||
+      !title.trim() ||
+      typeof categoryId !== "string" ||
+      !categoryId ||
+      typeof programId !== "string" ||
+      !programId
+    ) {
       res.status(400).json({ error: "invalid_input" });
       return;
     }
-    if (!cover || !video || !subtitleEn || !subtitleVi) {
+    if (!cover) {
+      res.status(400).json({ error: "missing_files" });
+      return;
+    }
+    if (mediaType === "VIDEO" && (!video || !subtitleEn || !subtitleVi)) {
+      res.status(400).json({ error: "missing_files" });
+      return;
+    }
+    if (mediaType === "AUDIO" && !audio) {
       res.status(400).json({ error: "missing_files" });
       return;
     }
 
-    const category = await prisma.category.findUnique({ where: { id: categoryId } });
+    const [category, program] = await Promise.all([
+      prisma.category.findUnique({ where: { id: categoryId } }),
+      prisma.program.findUnique({ where: { id: programId } }),
+    ]);
     if (!category) {
       res.status(400).json({ error: "invalid_category" });
       return;
     }
+    if (!program) {
+      res.status(400).json({ error: "invalid_program" });
+      return;
+    }
 
     const id = randomUUID();
-    const [coverUrl, videoUrl, subtitleEnUrl, subtitleViUrl] = await Promise.all([
+    const [coverUrl, videoUrl, subtitleEnUrl, subtitleViUrl, audioUrl] = await Promise.all([
       saveUploadedFile(cover.buffer, `stories/${id}/cover${fileExt(cover) || ".webp"}`),
-      saveUploadedFile(video.buffer, `stories/${id}/video${fileExt(video) || ".webm"}`),
-      saveUploadedFile(subtitleEn.buffer, `stories/${id}/subtitle_en${fileExt(subtitleEn) || ".srt"}`),
-      saveUploadedFile(subtitleVi.buffer, `stories/${id}/subtitle_vi${fileExt(subtitleVi) || ".srt"}`),
+      video ? saveUploadedFile(video.buffer, `stories/${id}/video${fileExt(video) || ".webm"}`) : Promise.resolve(null),
+      subtitleEn
+        ? saveUploadedFile(subtitleEn.buffer, `stories/${id}/subtitle_en${fileExt(subtitleEn) || ".srt"}`)
+        : Promise.resolve(null),
+      subtitleVi
+        ? saveUploadedFile(subtitleVi.buffer, `stories/${id}/subtitle_vi${fileExt(subtitleVi) || ".srt"}`)
+        : Promise.resolve(null),
+      audio ? saveUploadedFile(audio.buffer, `stories/${id}/audio${fileExt(audio) || ".mp3"}`) : Promise.resolve(null),
     ]);
 
     const story = await prisma.story.create({
@@ -132,15 +171,18 @@ router.post(
         videoUrl,
         subtitleEnUrl,
         subtitleViUrl,
+        audioUrl,
+        mediaType,
         duration: parseNullableInt(req.body?.duration) ?? null,
         accent: typeof accent === "string" && accent ? accent : null,
         minAge: parseNullableInt(req.body?.minAge) ?? null,
         maxAge: parseNullableInt(req.body?.maxAge) ?? null,
         published: req.body?.published === "false" ? false : true,
         categoryId,
+        programId,
         tags: { create: parseTags(req.body?.tags).map((tag) => ({ tag })) },
       },
-      include: { category: true, tags: true },
+      include: { category: true, tags: true, program: true },
     });
 
     res.status(201).json(serializeStory(story));
@@ -162,9 +204,10 @@ router.patch(
     const video = files?.video?.[0];
     const subtitleEn = files?.subtitleEn?.[0];
     const subtitleVi = files?.subtitleVi?.[0];
+    const audio = files?.audio?.[0];
     const id = existing.id;
 
-    const [coverUrl, videoUrl, subtitleEnUrl, subtitleViUrl] = await Promise.all([
+    const [coverUrl, videoUrl, subtitleEnUrl, subtitleViUrl, audioUrl] = await Promise.all([
       cover ? saveUploadedFile(cover.buffer, `stories/${id}/cover${fileExt(cover) || ".webp"}`) : Promise.resolve(undefined),
       video ? saveUploadedFile(video.buffer, `stories/${id}/video${fileExt(video) || ".webm"}`) : Promise.resolve(undefined),
       subtitleEn
@@ -173,14 +216,22 @@ router.patch(
       subtitleVi
         ? saveUploadedFile(subtitleVi.buffer, `stories/${id}/subtitle_vi${fileExt(subtitleVi) || ".srt"}`)
         : Promise.resolve(undefined),
+      audio ? saveUploadedFile(audio.buffer, `stories/${id}/audio${fileExt(audio) || ".mp3"}`) : Promise.resolve(undefined),
     ]);
 
-    const { title, episodeLabel, categoryId, accent, published, tags } = req.body ?? {};
+    const { title, episodeLabel, categoryId, programId, mediaType, accent, published, tags } = req.body ?? {};
 
     if (typeof categoryId === "string" && categoryId) {
       const category = await prisma.category.findUnique({ where: { id: categoryId } });
       if (!category) {
         res.status(400).json({ error: "invalid_category" });
+        return;
+      }
+    }
+    if (typeof programId === "string" && programId) {
+      const program = await prisma.program.findUnique({ where: { id: programId } });
+      if (!program) {
+        res.status(400).json({ error: "invalid_program" });
         return;
       }
     }
@@ -194,15 +245,18 @@ router.patch(
         ...(videoUrl ? { videoUrl } : {}),
         ...(subtitleEnUrl ? { subtitleEnUrl } : {}),
         ...(subtitleViUrl ? { subtitleViUrl } : {}),
+        ...(audioUrl ? { audioUrl } : {}),
+        ...(mediaType === "AUDIO" || mediaType === "VIDEO" ? { mediaType } : {}),
         ...(req.body?.duration !== undefined ? { duration: parseNullableInt(req.body.duration) } : {}),
         ...(typeof accent === "string" ? { accent: accent || null } : {}),
         ...(req.body?.minAge !== undefined ? { minAge: parseNullableInt(req.body.minAge) } : {}),
         ...(req.body?.maxAge !== undefined ? { maxAge: parseNullableInt(req.body.maxAge) } : {}),
         ...(published !== undefined ? { published: published !== "false" } : {}),
         ...(typeof categoryId === "string" && categoryId ? { categoryId } : {}),
+        ...(typeof programId === "string" && programId ? { programId } : {}),
         ...(tags !== undefined ? { tags: { deleteMany: {}, create: parseTags(tags).map((tag) => ({ tag })) } } : {}),
       },
-      include: { category: true, tags: true },
+      include: { category: true, tags: true, program: true },
     });
 
     res.json(serializeStory(story));
@@ -237,7 +291,13 @@ router.get(
       return;
     }
 
-    const url = resolveAssetUrl(story[SUBTITLE_FIELD[lang]]);
+    const subtitleUrl = story[SUBTITLE_FIELD[lang]];
+    if (!subtitleUrl) {
+      res.status(404).json({ error: "no_subtitle" });
+      return;
+    }
+
+    const url = resolveAssetUrl(subtitleUrl);
     try {
       const upstream = await fetch(url);
       if (!upstream.ok) throw new Error(`upstream ${upstream.status}`);
@@ -273,7 +333,7 @@ router.put(
     const updated = await prisma.story.update({
       where: { id: story.id },
       data: { [SUBTITLE_FIELD[lang]]: url },
-      include: { category: true, tags: true },
+      include: { category: true, tags: true, program: true },
     });
 
     res.json(serializeStory(updated));

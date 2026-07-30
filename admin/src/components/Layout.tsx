@@ -5,6 +5,7 @@ const NAV = [
   { to: "/", label: "Tổng quan", end: true },
   { to: "/stories", label: "Truyện" },
   { to: "/categories", label: "Chủ đề" },
+  { to: "/programs", label: "Chương trình" },
   { to: "/users", label: "Người dùng" },
   { to: "/ads", label: "Quảng cáo" },
 ];

@@ -1,4 +1,5 @@
 import { AnimatePresence, motion } from "framer-motion";
+import type { ComponentType, SVGProps } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AdBanner } from "@/components/AdBanner/AdBanner";
@@ -16,12 +17,13 @@ import { Logo } from "@/components/Logo/Logo";
 import { SkyBackground } from "@/components/SkyBackground/SkyBackground";
 import { StoryCard } from "@/components/StoryCard/StoryCard";
 import { getCategoryIcon } from "@/data/categoryVisuals";
+import { getProgramIcon } from "@/data/programVisuals";
 import { useEnsureCatalogLoaded } from "@/hooks/useEnsureCatalogLoaded";
 import { useAppStore } from "@/store/useAppStore";
 import { useAuthStore } from "@/store/useAuthStore";
 import { useCatalogStore } from "@/store/useCatalogStore";
 import { useFavoritesStore } from "@/store/useFavoritesStore";
-import type { Story, StoryCategory } from "@/types";
+import type { Category, Program, Story, StoryCategory } from "@/types";
 import { recommendStories } from "@/utils/recommend";
 import { playTick, playWhoosh } from "@/utils/sound";
 
@@ -30,21 +32,6 @@ import { playTick, playWhoosh } from "@/utils/sound";
 function edgeFadeStyle(atStart: boolean, atEnd: boolean, fade = 28) {
   const gradient = `linear-gradient(to right, ${atStart ? "black" : "transparent"} 0px, black ${fade}px, black calc(100% - ${fade}px), ${atEnd ? "black" : "transparent"} 100%)`;
   return { maskImage: gradient, WebkitMaskImage: gradient };
-}
-
-/** Small "there's more" nudge that sits on top of the fade zone - a card peeking a
- * single pixel through the fade reads as an accident, not an invitation to scroll. */
-function ScrollHint({ side = "right" }: { side?: "left" | "right" }) {
-  return (
-    <span
-      aria-hidden
-      className={`pointer-events-none absolute top-1/2 z-10 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full bg-white/80 text-slate-500 shadow-sm ${
-        side === "right" ? "right-1" : "left-1"
-      }`}
-    >
-      {side === "right" ? <IconChevronRight className="h-4 w-4" /> : <IconChevronLeft className="h-4 w-4" />}
-    </span>
-  );
 }
 
 /** A colorful sticker-badge + bold label used to head every rail/section, so each one reads
@@ -65,6 +52,30 @@ function SectionTitle({ emoji, title, accent }: { emoji: string; title: string; 
       </motion.span>
       <span className="font-heading text-lg font-extrabold tracking-tight text-white drop-shadow-[0_2px_2px_rgba(0,0,0,0.25)] sm:text-xl">
         {title}
+      </span>
+    </h2>
+  );
+}
+
+/** Same sticker-badge language as SectionTitle, but for a program's own icon component
+ * instead of an emoji - each program row is headed by its own icon and color. */
+function ProgramHeading({ program }: { program: Program }) {
+  const Icon = getProgramIcon(program.icon);
+  return (
+    <h2 className="flex items-center gap-2.5">
+      <motion.span
+        aria-hidden
+        initial={{ scale: 0, rotate: -25 }}
+        whileInView={{ scale: 1, rotate: -8 }}
+        viewport={{ once: true }}
+        transition={{ type: "spring", stiffness: 280, damping: 14 }}
+        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl text-white shadow-md ring-2 ring-white/70 sm:h-10 sm:w-10"
+        style={{ backgroundColor: program.color }}
+      >
+        <Icon className="h-5 w-5" />
+      </motion.span>
+      <span className="font-heading text-lg font-extrabold tracking-tight text-white drop-shadow-[0_2px_2px_rgba(0,0,0,0.25)] sm:text-xl">
+        {program.label}
       </span>
     </h2>
   );
@@ -108,7 +119,246 @@ function HeaderMenuButton({
   );
 }
 
-/** A horizontally-scrolling row of story cards with a title and a "see more" nudge arrow. */
+/** Tracks scroll-edge state for a horizontally-scrolling rail, shared by every rail on
+ * this page so each one fades/hints consistently without duplicating the wiring. */
+function useEdgeScrollState(items: unknown[]) {
+  const railRef = useRef<HTMLDivElement>(null);
+  const [edge, setEdge] = useState({ atStart: true, atEnd: true });
+
+  const updateEdge = () => {
+    const rail = railRef.current;
+    if (!rail) return;
+    setEdge({
+      atStart: rail.scrollLeft <= 4,
+      atEnd: rail.scrollLeft >= rail.scrollWidth - rail.clientWidth - 4,
+    });
+  };
+
+  useEffect(() => {
+    updateEdge();
+    window.addEventListener("resize", updateEdge);
+    return () => window.removeEventListener("resize", updateEdge);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items]);
+
+  return { railRef, edge, updateEdge };
+}
+
+/** The scrollable strip of story cards itself, without a header - reused by the plain
+ * StoryRail (which adds a title above it) and by each per-program row.
+ *
+ * `interactive` turns on the original "hero carousel" feel: click-and-drag panning on
+ * desktop, mouse-wheel support, a centered card that highlights and ticks as it changes,
+ * and hover-only prev/next arrows that whoosh. Off by default (compact secondary rails
+ * like Continue Watching never had this); ProgramRow's main lesson rail turns it on. */
+function ItemsRail({
+  railRef,
+  edge,
+  onScroll,
+  items,
+  onSelect,
+  getProgress,
+  isFavorite,
+  onToggleFavorite,
+  size = "compact",
+  interactive = false,
+}: {
+  railRef: React.RefObject<HTMLDivElement | null>;
+  edge: { atStart: boolean; atEnd: boolean };
+  onScroll: () => void;
+  items: Story[];
+  onSelect: (story: Story) => void;
+  getProgress?: (story: Story) => number | undefined;
+  isFavorite?: (story: Story) => boolean;
+  onToggleFavorite?: (story: Story) => void;
+  size?: "default" | "compact";
+  interactive?: boolean;
+}) {
+  const cardRefs = useRef(new Map<string, HTMLDivElement>());
+  const [activeId, setActiveId] = useState(items[0]?.id);
+  const [isDragging, setIsDragging] = useState(false);
+  // `down`: a mouse button is held. `dragging`: movement crossed the drag threshold, so we're
+  // actively panning the rail and should swallow the click that follows.
+  const dragState = useRef({ down: false, dragging: false, startX: 0, startScrollLeft: 0 });
+  const suppressNextClick = useRef(false);
+  const rafRef = useRef<number>(0);
+  const DRAG_THRESHOLD = 10;
+
+  // Recompute which card is centered from actual DOM positions (robust to responsive
+  // card widths/gaps instead of hardcoding sizes).
+  const updateActive = () => {
+    const rail = railRef.current;
+    if (!rail) return;
+    const center = rail.getBoundingClientRect().left + rail.clientWidth / 2;
+    let closestId: string | undefined;
+    let closestDist = Infinity;
+    for (const story of items) {
+      const el = cardRefs.current.get(story.id);
+      if (!el) continue;
+      const rect = el.getBoundingClientRect();
+      const dist = Math.abs(rect.left + rect.width / 2 - center);
+      if (dist < closestDist) {
+        closestDist = dist;
+        closestId = story.id;
+      }
+    }
+    if (closestId) {
+      setActiveId((prev) => {
+        if (prev !== closestId) playTick();
+        return closestId;
+      });
+    }
+  };
+
+  useEffect(() => {
+    if (!interactive) return;
+    if (railRef.current) railRef.current.scrollLeft = 0;
+    setActiveId(items[0]?.id);
+    updateActive();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items, interactive]);
+
+  const handleScroll = () => {
+    onScroll();
+    if (!interactive) return;
+    cancelAnimationFrame(rafRef.current);
+    rafRef.current = requestAnimationFrame(updateActive);
+  };
+
+  const handleWheel: React.WheelEventHandler<HTMLDivElement> = (e) => {
+    const rail = railRef.current;
+    if (!rail) return;
+    // Let a normal (vertical) mouse wheel drive the horizontal rail too.
+    rail.scrollLeft += Math.abs(e.deltaY) > Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
+  };
+
+  // Click-and-drag scrolling for desktop mice (touch/pen keep native momentum scrolling).
+  // Dragging only actually engages once the pointer moves past DRAG_THRESHOLD, so a plain
+  // click never grabs pointer capture or nudges scrollLeft.
+  const handlePointerDown: React.PointerEventHandler<HTMLDivElement> = (e) => {
+    if (e.pointerType !== "mouse") return;
+    const rail = railRef.current;
+    if (!rail) return;
+    dragState.current = { down: true, dragging: false, startX: e.clientX, startScrollLeft: rail.scrollLeft };
+  };
+
+  const handlePointerMove: React.PointerEventHandler<HTMLDivElement> = (e) => {
+    const rail = railRef.current;
+    const drag = dragState.current;
+    if (!rail || !drag.down) return;
+    const dx = e.clientX - drag.startX;
+
+    if (!drag.dragging) {
+      if (Math.abs(dx) < DRAG_THRESHOLD) return;
+      drag.dragging = true;
+      rail.setPointerCapture(e.pointerId);
+      setIsDragging(true);
+    }
+
+    rail.scrollLeft = drag.startScrollLeft - dx;
+  };
+
+  const endDrag: React.PointerEventHandler<HTMLDivElement> = (e) => {
+    if (e.pointerType !== "mouse") return;
+    dragState.current.down = false;
+    if (dragState.current.dragging) {
+      dragState.current.dragging = false;
+      suppressNextClick.current = true;
+    }
+    setIsDragging(false);
+  };
+
+  // Swallow the click that follows a real drag so it doesn't also open the story.
+  const handleClickCapture: React.MouseEventHandler<HTMLDivElement> = (e) => {
+    if (suppressNextClick.current) {
+      e.stopPropagation();
+      e.preventDefault();
+      suppressNextClick.current = false;
+    }
+  };
+
+  const goTo = (direction: 1 | -1) => {
+    const index = items.findIndex((s) => s.id === activeId);
+    const target = items[Math.min(Math.max(index + direction, 0), items.length - 1)];
+    const el = target && cardRefs.current.get(target.id);
+    el?.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+    playWhoosh(direction);
+  };
+
+  return (
+    <div className="relative">
+      {interactive && (
+        <div className="pointer-events-none absolute inset-0 z-10 hidden can-hover:block">
+          <CircleButton
+            icon={<IconChevronLeft className="h-7 w-7" />}
+            color="white"
+            size={56}
+            ariaLabel="Trước"
+            onClick={() => goTo(-1)}
+            disabled={edge.atStart}
+            className="pointer-events-auto absolute top-1/2 left-1 -translate-y-1/2"
+          />
+          <CircleButton
+            icon={<IconChevronRight className="h-7 w-7" />}
+            color="white"
+            size={56}
+            ariaLabel="Tiếp theo"
+            onClick={() => goTo(1)}
+            disabled={edge.atEnd}
+            className="pointer-events-auto absolute top-1/2 right-1 -translate-y-1/2"
+          />
+        </div>
+      )}
+
+      <div
+        ref={railRef}
+        onScroll={handleScroll}
+        onWheel={interactive ? handleWheel : undefined}
+        onPointerDown={interactive ? handlePointerDown : undefined}
+        onPointerMove={interactive ? handlePointerMove : undefined}
+        onPointerUp={interactive ? endDrag : undefined}
+        onPointerLeave={interactive ? endDrag : undefined}
+        onPointerCancel={interactive ? endDrag : undefined}
+        onClickCapture={interactive ? handleClickCapture : undefined}
+        className={
+          interactive
+            ? `no-select no-scrollbar safe-px flex snap-x snap-proximity gap-5 overflow-x-auto pt-3 pb-4 sm:gap-7 landscape-compact:gap-3 landscape-compact:pt-2 ${
+                isDragging ? "cursor-grabbing" : "cursor-grab"
+              }`
+            : "no-scrollbar safe-px flex gap-4 overflow-x-auto pt-3 pb-2"
+        }
+        style={{
+          ...(interactive ? { scrollPadding: "0 8px" } : { scrollSnapType: "x proximity" as const }),
+          ...edgeFadeStyle(edge.atStart, edge.atEnd, interactive ? 32 : 28),
+        }}
+      >
+        {items.map((story) => (
+          <div
+            key={story.id}
+            ref={(el) => {
+              if (!interactive) return;
+              if (el) cardRefs.current.set(story.id, el);
+              else cardRefs.current.delete(story.id);
+            }}
+            style={{ scrollSnapAlign: "start" }}
+          >
+            <StoryCard
+              story={story}
+              onSelect={onSelect}
+              size={size}
+              isActive={interactive ? story.id === activeId : true}
+              progress={getProgress?.(story)}
+              favorite={isFavorite?.(story)}
+              onToggleFavorite={onToggleFavorite}
+            />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** A horizontally-scrolling row of story cards with a title above it. */
 function StoryRail({
   title,
   emoji,
@@ -128,63 +378,195 @@ function StoryRail({
   isFavorite?: (story: Story) => boolean;
   onToggleFavorite?: (story: Story) => void;
 }) {
-  const railRef = useRef<HTMLDivElement>(null);
-  const [edge, setEdge] = useState({ atStart: true, atEnd: true });
-  const scrollBy = (dir: 1 | -1) => railRef.current?.scrollBy({ left: dir * 320, behavior: "smooth" });
-
-  const updateEdge = () => {
-    const rail = railRef.current;
-    if (!rail) return;
-    setEdge({
-      atStart: rail.scrollLeft <= 4,
-      atEnd: rail.scrollLeft >= rail.scrollWidth - rail.clientWidth - 4,
-    });
-  };
-
-  useEffect(() => {
-    updateEdge();
-    window.addEventListener("resize", updateEdge);
-    return () => window.removeEventListener("resize", updateEdge);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [items]);
+  const { railRef, edge, updateEdge } = useEdgeScrollState(items);
 
   if (items.length === 0) return null;
 
   return (
     <section className="pt-8 landscape-compact:pt-4">
-      <div className="safe-px mb-3 flex items-center justify-between">
+      <div className="safe-px mb-3">
         <SectionTitle emoji={emoji} title={title} accent={accent} />
-        <CircleButton
-          icon={<IconChevronRight className="h-5 w-5" />}
-          color="white"
-          size={40}
-          ariaLabel={`Xem thêm ${title}`}
-          onClick={() => scrollBy(1)}
-          className="hidden can-hover:flex"
-        />
       </div>
-      <div className="relative">
-        <div
-          ref={railRef}
-          onScroll={updateEdge}
-          className="no-scrollbar safe-px flex gap-4 overflow-x-auto pt-3 pb-2"
-          style={{ scrollSnapType: "x proximity", ...edgeFadeStyle(edge.atStart, edge.atEnd) }}
-        >
-          {items.map((story) => (
-            <div key={story.id} style={{ scrollSnapAlign: "start" }}>
-              <StoryCard
-                story={story}
-                onSelect={onSelect}
-                size="compact"
-                progress={getProgress?.(story)}
-                favorite={isFavorite?.(story)}
-                onToggleFavorite={onToggleFavorite}
-              />
-            </div>
-          ))}
+      <ItemsRail
+        railRef={railRef}
+        edge={edge}
+        onScroll={updateEdge}
+        items={items}
+        onSelect={onSelect}
+        getProgress={getProgress}
+        isFavorite={isFavorite}
+        onToggleFavorite={onToggleFavorite}
+      />
+    </section>
+  );
+}
+
+interface ChipItem {
+  id: StoryCategory | null;
+  label: string;
+  Icon: ComponentType<SVGProps<SVGSVGElement>>;
+  color: string;
+}
+
+/** Three different chip treatments for a program's category filter, picked by row index so
+ * consecutive program rows never look like copies of each other: stacked circle badges,
+ * inline color pills, and flat white cards. Same interaction, different costume. */
+function CategoryChipRow({
+  variant,
+  items,
+  active,
+  onChange,
+}: {
+  variant: number;
+  items: ChipItem[];
+  active: StoryCategory | null;
+  onChange: (id: StoryCategory | null) => void;
+}) {
+  return (
+    <div className="no-scrollbar flex gap-2.5 overflow-x-auto py-1">
+      {items.map((item) => {
+        const isActive = active === item.id;
+        const Icon = item.Icon;
+        const key = item.id ?? "all";
+
+        if (variant === 1) {
+          return (
+            <motion.button
+              key={key}
+              type="button"
+              whileTap={{ scale: 0.94 }}
+              onClick={() => onChange(item.id)}
+              className={`flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-2 shadow-sm ring-2 transition-colors ${
+                isActive ? "ring-white" : "ring-transparent"
+              }`}
+              style={{ backgroundColor: isActive ? item.color : `${item.color}26` }}
+            >
+              <Icon className={`h-4 w-4 ${isActive ? "text-white" : "text-white/85"}`} />
+              <span
+                className={`font-heading text-xs font-bold whitespace-nowrap ${isActive ? "text-white" : "text-white/85"}`}
+              >
+                {item.label}
+              </span>
+            </motion.button>
+          );
+        }
+
+        if (variant === 2) {
+          return (
+            <motion.button
+              key={key}
+              type="button"
+              whileTap={{ scale: 0.94 }}
+              onClick={() => onChange(item.id)}
+              className={`flex shrink-0 items-center gap-2 rounded-2xl px-3 py-2 shadow-md ring-2 transition-all ${
+                isActive ? "bg-white ring-white" : "bg-white/70 ring-transparent"
+              }`}
+            >
+              <span
+                className="flex h-7 w-7 items-center justify-center rounded-lg text-white"
+                style={{ backgroundColor: item.color }}
+              >
+                <Icon className="h-4 w-4" />
+              </span>
+              <span className="font-heading text-xs font-bold whitespace-nowrap text-slate-700">{item.label}</span>
+            </motion.button>
+          );
+        }
+
+        return (
+          <button key={key} type="button" onClick={() => onChange(item.id)} className="flex w-16 shrink-0 flex-col items-center gap-1">
+            <motion.span
+              whileTap={{ scale: 0.92 }}
+              className={`flex h-12 w-12 items-center justify-center rounded-full text-white shadow-md ring-4 transition-all ${
+                isActive ? "scale-105 ring-white" : "ring-white/40"
+              }`}
+              style={{ backgroundColor: item.color }}
+            >
+              <Icon className="h-6 w-6" />
+            </motion.span>
+            <span
+              className={`text-center font-heading text-[11px] leading-tight font-bold drop-shadow-sm ${
+                isActive ? "text-[#FFD54A]" : "text-white"
+              }`}
+            >
+              {item.label}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/** One program's own shelf: its heading, its category filter (styled differently per row so
+ * the page doesn't read as one long repeating list), and its story rail. Renders nothing when
+ * the program has no stories at all, so an empty program never shows up as a dead section. */
+function ProgramRow({
+  program,
+  index,
+  stories,
+  allCategories,
+  onSelect,
+  getProgress,
+  isFavorite,
+  onToggleFavorite,
+}: {
+  program: Program;
+  index: number;
+  stories: Story[];
+  allCategories: Category[];
+  onSelect: (story: Story) => void;
+  getProgress?: (story: Story) => number | undefined;
+  isFavorite?: (story: Story) => boolean;
+  onToggleFavorite?: (story: Story) => void;
+}) {
+  const [category, setCategory] = useState<StoryCategory | null>(null);
+  const visible = useMemo(
+    () => (category ? stories.filter((s) => s.category === category) : stories),
+    [stories, category]
+  );
+  const { railRef, edge, updateEdge } = useEdgeScrollState(visible);
+
+  if (stories.length === 0) return null;
+
+  const programCategories = allCategories.filter((c) => stories.some((s) => s.category === c.id));
+  const variant = index % 3;
+  const chipItems: ChipItem[] = [
+    { id: null, label: "Tất cả", Icon: IconStar, color: program.color },
+    ...programCategories.map((c) => ({ id: c.id, label: c.label, Icon: getCategoryIcon(c.icon), color: c.color })),
+  ];
+
+  return (
+    <section className="relative pt-8 landscape-compact:pt-4">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0"
+        style={{ background: `linear-gradient(180deg, ${program.color}20 0%, ${program.color}00 80%)` }}
+      />
+
+      <div className="safe-px mb-2 flex items-center gap-4">
+        <div className="shrink-0">
+          <ProgramHeading program={program} />
         </div>
-        {!edge.atEnd && <ScrollHint side="right" />}
+        {programCategories.length > 1 && (
+          <div className="min-w-0 flex-1">
+            <CategoryChipRow variant={variant} items={chipItems} active={category} onChange={setCategory} />
+          </div>
+        )}
       </div>
+
+      <ItemsRail
+        railRef={railRef}
+        edge={edge}
+        onScroll={updateEdge}
+        items={visible}
+        onSelect={onSelect}
+        getProgress={getProgress}
+        isFavorite={isFavorite}
+        onToggleFavorite={onToggleFavorite}
+        size="default"
+        interactive
+      />
     </section>
   );
 }
@@ -300,6 +682,7 @@ export function Home() {
   useEnsureCatalogLoaded();
   const stories = useCatalogStore((s) => s.stories);
   const storyCategories = useCatalogStore((s) => s.categories);
+  const programs = useCatalogStore((s) => s.programs);
   const activeChildId = useAuthStore((s) => s.activeChildId)!;
   const child = useAuthStore((s) => s.children.find((c) => c.id === activeChildId));
   const stars = useAppStore((s) => s.starsByChild[activeChildId] ?? 0);
@@ -308,13 +691,23 @@ export function Home() {
   const loadFavorites = useFavoritesStore((s) => s.loadFavorites);
   const toggleFavorite = useFavoritesStore((s) => s.toggleFavorite);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [category, setCategory] = useState<StoryCategory | null>(null);
 
   useEffect(() => {
     loadFavorites(activeChildId).catch(() => {});
   }, [activeChildId, loadFavorites]);
 
-  const visibleStories = category ? stories.filter((s) => s.category === category) : stories;
+  // Only programs whose discrete age list includes this child's age are ever shown.
+  const eligiblePrograms = useMemo(
+    () => (child ? programs.filter((p) => p.ages.includes(child.age)) : []),
+    [programs, child]
+  );
+
+  // Each program gets its own story list up front, so a program with zero stories can be
+  // skipped entirely instead of rendering as an empty shelf.
+  const programSections = useMemo(
+    () => eligiblePrograms.map((p) => ({ program: p, stories: stories.filter((s) => s.program === p.id) })),
+    [eligiblePrograms, stories]
+  );
 
   const handleSelect = (story: Story) => navigate(`/story/${story.id}`);
   const isFavorite = (story: Story) => favoriteIds.includes(story.id);
@@ -329,7 +722,7 @@ export function Home() {
       )
       .sort((a, b) => b.entry.updatedAt - a.entry.updatedAt)
       .slice(0, 12);
-  }, [storyProgress]);
+  }, [stories, storyProgress]);
 
   const recentlyWatchedStories = useMemo(() => {
     return stories
@@ -340,159 +733,19 @@ export function Home() {
       .sort((a, b) => b.entry.updatedAt - a.entry.updatedAt)
       .slice(0, 12)
       .map((x) => x.story);
-  }, [storyProgress]);
+  }, [stories, storyProgress]);
 
   const favoriteStories = useMemo(
     () => stories.filter((s) => favoriteIds.includes(s.id)),
-    [favoriteIds]
+    [stories, favoriteIds]
   );
 
   const recommendedStories = useMemo(
     () => (child ? recommendStories(stories, child, storyProgress) : []),
-    [child, storyProgress]
+    [stories, child, storyProgress]
   );
 
-  const newStories = useMemo(() => stories.filter((s) => s.tags?.includes("new")), []);
-
-  const railRef = useRef<HTMLDivElement>(null);
-  const cardRefs = useRef(new Map<string, HTMLDivElement>());
-  const [activeId, setActiveId] = useState(visibleStories[0]?.id);
-  const [edge, setEdge] = useState({ atStart: true, atEnd: false });
-  const [isDragging, setIsDragging] = useState(false);
-  // `down`: a mouse button is held. `dragging`: movement crossed the drag threshold, so we're
-  // actively panning the rail and should swallow the click that follows.
-  const dragState = useRef({ down: false, dragging: false, startX: 0, startScrollLeft: 0 });
-  const suppressNextClick = useRef(false);
-  const DRAG_THRESHOLD = 10;
-
-  // Recompute which card is centered, and the scroll edges, from actual DOM positions
-  // (robust to responsive card widths/gaps instead of hardcoding sizes).
-  const updateFromScroll = () => {
-    const rail = railRef.current;
-    if (!rail) return;
-
-    setEdge({
-      atStart: rail.scrollLeft <= 4,
-      atEnd: rail.scrollLeft >= rail.scrollWidth - rail.clientWidth - 4,
-    });
-
-    const center = rail.getBoundingClientRect().left + rail.clientWidth / 2;
-    let closestId: string | undefined;
-    let closestDist = Infinity;
-    for (const story of visibleStories) {
-      const el = cardRefs.current.get(story.id);
-      if (!el) continue;
-      const rect = el.getBoundingClientRect();
-      const dist = Math.abs(rect.left + rect.width / 2 - center);
-      if (dist < closestDist) {
-        closestDist = dist;
-        closestId = story.id;
-      }
-    }
-    if (closestId) {
-      setActiveId((prev) => {
-        if (prev !== closestId) playTick();
-        return closestId;
-      });
-    }
-  };
-
-  // Same edge-fade idea for the category tray: only fade a side that still has
-  // more chips to scroll to, so a short, fully-visible list stays fully opaque.
-  const catRailRef = useRef<HTMLDivElement>(null);
-  const [catEdge, setCatEdge] = useState({ atStart: true, atEnd: true });
-
-  const updateCatEdge = () => {
-    const el = catRailRef.current;
-    if (!el) return;
-    setCatEdge({
-      atStart: el.scrollLeft <= 4,
-      atEnd: el.scrollLeft >= el.scrollWidth - el.clientWidth - 4,
-    });
-  };
-
-  useEffect(() => {
-    updateCatEdge();
-    window.addEventListener("resize", updateCatEdge);
-    return () => window.removeEventListener("resize", updateCatEdge);
-  }, []);
-
-  useEffect(() => {
-    const rail = railRef.current;
-    if (rail) rail.scrollLeft = 0;
-    setActiveId(visibleStories[0]?.id);
-    updateFromScroll();
-    const onResize = () => updateFromScroll();
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [category]);
-
-  const rafRef = useRef<number>(0);
-  const handleScroll = () => {
-    cancelAnimationFrame(rafRef.current);
-    rafRef.current = requestAnimationFrame(updateFromScroll);
-  };
-
-  const handleWheel: React.WheelEventHandler<HTMLDivElement> = (e) => {
-    const rail = railRef.current;
-    if (!rail) return;
-    // Let a normal (vertical) mouse wheel drive the horizontal rail too.
-    rail.scrollLeft += Math.abs(e.deltaY) > Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
-  };
-
-  // Click-and-drag scrolling for desktop mice (touch/pen keep native momentum scrolling).
-  // Dragging only actually engages once the pointer moves past DRAG_THRESHOLD, so a plain
-  // click never grabs pointer capture or nudges scrollLeft - that's what was swallowing taps.
-  const handlePointerDown: React.PointerEventHandler<HTMLDivElement> = (e) => {
-    if (e.pointerType !== "mouse") return;
-    const rail = railRef.current;
-    if (!rail) return;
-    dragState.current = { down: true, dragging: false, startX: e.clientX, startScrollLeft: rail.scrollLeft };
-  };
-
-  const handlePointerMove: React.PointerEventHandler<HTMLDivElement> = (e) => {
-    const rail = railRef.current;
-    const drag = dragState.current;
-    if (!rail || !drag.down) return;
-    const dx = e.clientX - drag.startX;
-
-    if (!drag.dragging) {
-      if (Math.abs(dx) < DRAG_THRESHOLD) return;
-      drag.dragging = true;
-      rail.setPointerCapture(e.pointerId);
-      setIsDragging(true);
-    }
-
-    rail.scrollLeft = drag.startScrollLeft - dx;
-  };
-
-  const endDrag: React.PointerEventHandler<HTMLDivElement> = (e) => {
-    if (e.pointerType !== "mouse") return;
-    dragState.current.down = false;
-    if (dragState.current.dragging) {
-      dragState.current.dragging = false;
-      suppressNextClick.current = true;
-    }
-    setIsDragging(false);
-  };
-
-  // Swallow the click that follows a real drag so it doesn't also open the story.
-  const handleClickCapture: React.MouseEventHandler<HTMLDivElement> = (e) => {
-    if (suppressNextClick.current) {
-      e.stopPropagation();
-      e.preventDefault();
-      suppressNextClick.current = false;
-    }
-  };
-
-  const goTo = (direction: 1 | -1) => {
-    const index = visibleStories.findIndex((s) => s.id === activeId);
-    const target = visibleStories[Math.min(Math.max(index + direction, 0), visibleStories.length - 1)];
-    const el = target && cardRefs.current.get(target.id);
-    el?.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
-    playWhoosh(direction);
-  };
+  const newStories = useMemo(() => stories.filter((s) => s.tags?.includes("new")), [stories]);
 
   return (
     <div className="relative h-full w-full overflow-hidden">
@@ -533,6 +786,20 @@ export function Home() {
 
         {child && <HomeGreeting name={child.name} gender={child.gender} />}
 
+        {programSections.map(({ program, stories: rowStories }, i) => (
+          <ProgramRow
+            key={program.id}
+            program={program}
+            index={i}
+            stories={rowStories}
+            allCategories={storyCategories}
+            onSelect={handleSelect}
+            getProgress={(story) => storyProgress[story.id]?.ratio}
+            isFavorite={isFavorite}
+            onToggleFavorite={handleToggleFavorite}
+          />
+        ))}
+
         <AdBanner age={child?.age} />
 
         <StoryRail
@@ -565,135 +832,6 @@ export function Home() {
           isFavorite={isFavorite}
           onToggleFavorite={handleToggleFavorite}
         />
-
-        <section className="pt-8 pb-6 landscape-compact:pt-4">
-          <div className="safe-px mb-3 flex items-center justify-between">
-            <SectionTitle
-              emoji="📚"
-              title={`Kho truyện${category ? ` · ${storyCategories.find((c) => c.id === category)?.label}` : ""}`}
-              accent="#5CC8FF"
-            />
-          </div>
-
-          <div className="relative mb-2">
-            <div
-              ref={catRailRef}
-              onScroll={updateCatEdge}
-              className="no-scrollbar safe-px flex gap-3 overflow-x-auto pt-2 pb-1"
-              style={edgeFadeStyle(catEdge.atStart, catEdge.atEnd, 20)}
-            >
-              <button
-                type="button"
-                onClick={() => setCategory(null)}
-                className="flex w-[72px] shrink-0 flex-col items-center gap-1.5 sm:w-20"
-              >
-                <motion.span
-                  whileTap={{ scale: 0.92 }}
-                  className={`flex h-14 w-14 items-center justify-center rounded-full bg-[#B79CFF] text-white shadow-md ring-4 transition-all sm:h-16 sm:w-16 ${
-                    category === null ? "scale-105 ring-white" : "ring-white/40"
-                  }`}
-                >
-                  <IconStar className="h-7 w-7 sm:h-8 sm:w-8" />
-                </motion.span>
-                <span
-                  className={`text-center font-heading text-xs leading-tight font-bold drop-shadow-sm ${
-                    category === null ? "text-[#FFD54A]" : "text-white"
-                  }`}
-                >
-                  Tất cả
-                </span>
-              </button>
-              {storyCategories.map((c) => {
-                const Icon = getCategoryIcon(c.icon);
-                const active = category === c.id;
-                return (
-                  <button
-                    key={c.id}
-                    type="button"
-                    onClick={() => setCategory(c.id)}
-                    className="flex w-[72px] shrink-0 flex-col items-center gap-1.5 sm:w-20"
-                  >
-                    <motion.span
-                      whileTap={{ scale: 0.92 }}
-                      style={{ backgroundColor: c.color }}
-                      className={`flex h-14 w-14 items-center justify-center rounded-full text-white shadow-md ring-4 transition-all sm:h-16 sm:w-16 ${
-                        active ? "scale-105 ring-white" : "ring-white/40"
-                      }`}
-                    >
-                      <Icon className="h-7 w-7 sm:h-8 sm:w-8" />
-                    </motion.span>
-                    <span
-                      className={`text-center font-heading text-xs leading-tight font-bold drop-shadow-sm ${
-                        active ? "text-[#FFD54A]" : "text-white"
-                      }`}
-                    >
-                      {c.label}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-            {!catEdge.atEnd && <ScrollHint side="right" />}
-          </div>
-
-          <div className="safe-px relative flex items-center py-4 landscape-compact:py-2">
-            <div className="pointer-events-none absolute inset-0 z-10 hidden can-hover:block">
-              <CircleButton
-                icon={<IconChevronLeft className="h-7 w-7" />}
-                color="white"
-                size={56}
-                ariaLabel="Truyện trước"
-                onClick={() => goTo(-1)}
-                disabled={edge.atStart}
-                className="pointer-events-auto absolute top-1/2 left-1 -translate-y-1/2"
-              />
-              <CircleButton
-                icon={<IconChevronRight className="h-7 w-7" />}
-                color="white"
-                size={56}
-                ariaLabel="Truyện tiếp theo"
-                onClick={() => goTo(1)}
-                disabled={edge.atEnd}
-                className="pointer-events-auto absolute top-1/2 right-1 -translate-y-1/2"
-              />
-            </div>
-
-            <div
-              ref={railRef}
-              onScroll={handleScroll}
-              onWheel={handleWheel}
-              onPointerDown={handlePointerDown}
-              onPointerMove={handlePointerMove}
-              onPointerUp={endDrag}
-              onPointerLeave={endDrag}
-              onPointerCancel={endDrag}
-              onClickCapture={handleClickCapture}
-              className={`no-select no-scrollbar flex w-full shrink-0 snap-x snap-proximity gap-5 overflow-x-auto pt-3 pb-4 sm:gap-7 landscape-compact:gap-3 landscape-compact:pt-2 ${
-                isDragging ? "cursor-grabbing" : "cursor-grab"
-              }`}
-              style={{ scrollPadding: "0 8px", ...edgeFadeStyle(edge.atStart, edge.atEnd, 32) }}
-            >
-              {visibleStories.map((story) => (
-                <div
-                  key={story.id}
-                  ref={(el) => {
-                    if (el) cardRefs.current.set(story.id, el);
-                    else cardRefs.current.delete(story.id);
-                  }}
-                  className="snap-start"
-                >
-                  <StoryCard
-                    story={story}
-                    onSelect={handleSelect}
-                    isActive={story.id === activeId}
-                    favorite={isFavorite(story)}
-                    onToggleFavorite={handleToggleFavorite}
-                  />
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
 
         <StoryRail
           title="Xem gần đây"

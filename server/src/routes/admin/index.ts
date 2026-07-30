@@ -5,6 +5,7 @@ import { asyncHandler } from "../../middleware/asyncHandler.js";
 import authRouter from "./auth.js";
 import storiesRouter from "./stories.js";
 import categoriesRouter from "./categories.js";
+import programsRouter from "./programs.js";
 import usersRouter from "./users.js";
 import adsRouter from "./ads.js";
 
@@ -29,6 +30,7 @@ router.get(
 
 router.use("/stories", storiesRouter);
 router.use("/categories", categoriesRouter);
+router.use("/programs", programsRouter);
 router.use("/users", usersRouter);
 router.use("/ads", adsRouter);
 

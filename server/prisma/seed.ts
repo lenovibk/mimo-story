@@ -25,6 +25,70 @@ const categories = [
   { slug: "world", label: "Thế giới xung quanh", icon: "globe", color: "#6FE0C8", order: 9 },
 ];
 
+const programs = [
+  {
+    slug: "truyen",
+    label: "Truyện",
+    icon: "book",
+    color: "#5CC8FF",
+    order: 0,
+    published: true,
+    ages: [3, 4, 5, 6, 7],
+    categorySlugs: [
+      "animals",
+      "emotions",
+      "body",
+      "family",
+      "weather",
+      "holidays",
+      "school",
+      "activities",
+      "food",
+      "world",
+    ],
+  },
+  {
+    slug: "bai-hat",
+    label: "Bài hát",
+    icon: "music",
+    color: "#FFD54A",
+    order: 1,
+    published: false,
+    ages: [3, 4, 5, 6, 7],
+    categorySlugs: ["animals", "emotions", "holidays", "activities"],
+  },
+  {
+    slug: "hoi-thoai",
+    label: "Hội thoại giao tiếp",
+    icon: "chat",
+    color: "#8EE28E",
+    order: 2,
+    published: false,
+    ages: [5, 6, 7],
+    categorySlugs: ["family", "school", "activities", "world"],
+  },
+  {
+    slug: "podcast",
+    label: "Podcast",
+    icon: "headphones",
+    color: "#B79CFF",
+    order: 3,
+    published: false,
+    ages: [6, 7],
+    categorySlugs: ["world", "school"],
+  },
+  {
+    slug: "little-fox",
+    label: "Little Fox",
+    icon: "fox",
+    color: "#FF92C2",
+    order: 4,
+    published: false,
+    ages: [4, 5, 6, 7],
+    categorySlugs: ["animals", "family", "world"],
+  },
+];
+
 type SeedStory = {
   id: string;
   title: string;
@@ -120,6 +184,29 @@ async function main() {
     categoryIdBySlug.set(c.slug, row.id);
   }
 
+  const programIdBySlug = new Map<string, string>();
+
+  for (const p of programs) {
+    const row = await prisma.program.upsert({
+      where: { slug: p.slug },
+      update: { label: p.label, icon: p.icon, color: p.color, order: p.order, published: p.published },
+      create: { slug: p.slug, label: p.label, icon: p.icon, color: p.color, order: p.order, published: p.published },
+    });
+    programIdBySlug.set(p.slug, row.id);
+
+    await prisma.programAgeLink.deleteMany({ where: { programId: row.id } });
+    await prisma.programAgeLink.createMany({
+      data: p.ages.map((age) => ({ programId: row.id, age })),
+    });
+
+    await prisma.programCategoryLink.deleteMany({ where: { programId: row.id } });
+    await prisma.programCategoryLink.createMany({
+      data: p.categorySlugs.map((slug) => ({ programId: row.id, categoryId: categoryIdBySlug.get(slug)! })),
+    });
+  }
+
+  const truyenProgramId = programIdBySlug.get("truyen")!;
+
   for (const s of stories) {
     const categoryId = categoryIdBySlug.get(s.category);
     if (!categoryId) throw new Error(`Unknown category slug "${s.category}" for story ${s.id}`);
@@ -135,6 +222,7 @@ async function main() {
       duration: s.duration,
       accent: s.accent,
       categoryId,
+      programId: truyenProgramId,
     };
 
     await prisma.story.upsert({
@@ -151,7 +239,7 @@ async function main() {
     });
   }
 
-  console.log(`Seeded ${categories.length} categories and ${stories.length} stories.`);
+  console.log(`Seeded ${categories.length} categories, ${programs.length} programs, and ${stories.length} stories.`);
 }
 
 main()

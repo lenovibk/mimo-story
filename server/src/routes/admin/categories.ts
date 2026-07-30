@@ -1,18 +1,9 @@
 import { Router } from "express";
 import { prisma } from "../../prisma.js";
 import { asyncHandler } from "../../middleware/asyncHandler.js";
+import { slugify } from "../../services/slugify.js";
 
 const router = Router();
-
-function slugify(input: string): string {
-  return input
-    .trim()
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/(^-|-$)/g, "");
-}
 
 router.get(
   "/",

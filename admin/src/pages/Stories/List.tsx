@@ -1,34 +1,43 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "@/services/api";
-import type { Category, Story } from "@/types";
+import type { Category, Program, Story } from "@/types";
 
 const PAGE_SIZE = 20;
 
 export function StoriesList() {
   const [stories, setStories] = useState<Story[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [programs, setPrograms] = useState<Program[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(0);
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
+  const [programFilter, setProgramFilter] = useState("");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     api.getCategories().then(setCategories).catch(() => {});
+    api.getPrograms().then(setPrograms).catch(() => {});
   }, []);
 
   useEffect(() => {
     setLoading(true);
     api
-      .getStories({ search: search || undefined, category: categoryFilter || undefined, skip: page * PAGE_SIZE, take: PAGE_SIZE })
+      .getStories({
+        search: search || undefined,
+        category: categoryFilter || undefined,
+        program: programFilter || undefined,
+        skip: page * PAGE_SIZE,
+        take: PAGE_SIZE,
+      })
       .then((res) => {
         setStories(res.stories);
         setTotal(res.total);
       })
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, [search, categoryFilter, page]);
+  }, [search, categoryFilter, programFilter, page]);
 
   const handleDelete = async (id: string) => {
     if (!confirm("Xoá truyện này? Không thể hoàn tác.")) return;
@@ -71,6 +80,21 @@ export function StoriesList() {
             </option>
           ))}
         </select>
+        <select
+          value={programFilter}
+          onChange={(e) => {
+            setPage(0);
+            setProgramFilter(e.target.value);
+          }}
+          className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+        >
+          <option value="">Tất cả chương trình</option>
+          {programs.map((p) => (
+            <option key={p.id} value={p.slug}>
+              {p.label}
+            </option>
+          ))}
+        </select>
       </div>
 
       {loading ? (
@@ -84,6 +108,7 @@ export function StoriesList() {
                   <th className="px-4 py-3">Ảnh bìa</th>
                   <th className="px-4 py-3">Tên truyện</th>
                   <th className="px-4 py-3">Chủ đề</th>
+                  <th className="px-4 py-3">Chương trình</th>
                   <th className="px-4 py-3">Tuổi đề xuất</th>
                   <th className="px-4 py-3">Trạng thái</th>
                   <th className="px-4 py-3"></th>
@@ -100,6 +125,7 @@ export function StoriesList() {
                       {s.episodeLabel && <p className="text-xs text-slate-400">{s.episodeLabel}</p>}
                     </td>
                     <td className="px-4 py-2 text-slate-500">{s.categoryLabel}</td>
+                    <td className="px-4 py-2 text-slate-500">{s.programLabel}</td>
                     <td className="px-4 py-2 text-slate-500">
                       {s.minAge != null || s.maxAge != null ? `${s.minAge ?? "0"}–${s.maxAge ?? "∞"}` : "—"}
                     </td>

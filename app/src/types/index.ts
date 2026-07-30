@@ -24,19 +24,39 @@ export interface Category {
   color: string;
 }
 
+/** A "chương trình học" (curriculum track), e.g. Truyện / Bài hát / Podcast. */
+export interface Program {
+  /** The program's slug, e.g. "truyen" - doubles as its id. */
+  id: string;
+  label: string;
+  /** Key into the app's fixed icon map, see data/programVisuals.tsx. */
+  icon: string;
+  color: string;
+  /** Discrete ages this program applies to (3,4,5,6,7 - 7 meaning "7+"). */
+  ages: number[];
+  /** Category slugs this program's content is drawn from. */
+  categoryIds: StoryCategory[];
+}
+
 export interface Story {
   id: string;
   title: string;
   episodeLabel?: string;
   /** WebP cover image. */
   cover: string;
-  /** VP9/Opus WebM video. Not playable on iOS/Safari. */
-  video: string;
+  /** VP9/Opus WebM video. Not playable on iOS/Safari. Absent for audio-only content. */
+  video?: string;
   /** Runtime in seconds, shown on the story list and as the total in the player's progress readout. */
   duration?: number;
-  subtitleEn: string;
-  subtitleVi: string;
+  subtitleEn?: string;
+  subtitleVi?: string;
+  /** Present when mediaType is "AUDIO" (songs/podcasts). */
+  audio?: string;
+  /** "VIDEO" | "AUDIO" */
+  mediaType: string;
   category: StoryCategory;
+  /** Program slug this content belongs to. */
+  program: string;
   tags?: StoryTag[];
   accent?: "primary" | "yellow" | "pink" | "green" | "night";
   /** Recommended age range set by admin; either bound may be open-ended. */

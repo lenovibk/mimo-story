@@ -16,6 +16,7 @@ export const uploadStoryFiles = multer({
   { name: "video", maxCount: 1 },
   { name: "subtitleEn", maxCount: 1 },
   { name: "subtitleVi", maxCount: 1 },
+  { name: "audio", maxCount: 1 },
 ]);
 
 export const uploadAdImage = multer({
