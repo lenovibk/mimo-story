@@ -28,7 +28,7 @@ export function SkyBackground() {
         src="/images/home-bg.svg"
         alt=""
         draggable={false}
-        className="absolute inset-0 h-full w-full object-cover object-top"
+        className="absolute inset-0 h-full w-full object-cover object-bottom"
       />
       {CLOUDS.map((cloud, i) => (
         <span

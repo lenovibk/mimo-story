@@ -53,22 +53,27 @@ export function AdBanner({ placement = "home_banner", age }: AdBannerProps) {
       initial={{ opacity: 0, y: -8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, ease: "easeOut" }}
-      className="safe-px mt-4 w-full"
+      className="safe-px mt-6 mb-8 w-full"
     >
-      <div className="relative overflow-hidden rounded-[24px] shadow-md">
-        <AnimatePresence mode="wait" initial={false}>
+      <div className="relative aspect-[2/1] w-full overflow-hidden rounded-[24px] border-[3px] border-white shadow-md">
+        {/* A fixed aspect ratio on this wrapper (ad art is a consistent 2:1) means every slide
+            can be absolutely stacked inset-0 and cross-fade/slide over each other - both the
+            incoming and outgoing slide animate at the same time, so there's never a blank frame
+            between ads the way `mode="wait"` produced when the outgoing one had to fully finish
+            exiting before the next started entering. */}
+        <AnimatePresence initial={false}>
           <motion.button
             key={ad.id}
             type="button"
             onClick={handleClick}
-            initial={{ x: 48, opacity: 0 }}
+            initial={{ x: "100%", opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}
-            exit={{ x: -48, opacity: 0 }}
-            transition={{ duration: 0.5, ease: "easeInOut" }}
-            className="block w-full"
+            exit={{ x: "-100%", opacity: 0 }}
+            transition={{ duration: 0.6, ease: [0.4, 0, 0.2, 1] }}
+            className="absolute inset-0 block h-full w-full"
             aria-label={ad.title}
           >
-            <img src={ad.imageUrl} alt={ad.title} className="h-auto w-full object-cover" />
+            <img src={ad.imageUrl} alt={ad.title} className="h-full w-full object-cover" />
           </motion.button>
         </AnimatePresence>
 

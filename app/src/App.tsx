@@ -5,9 +5,11 @@ import { Home } from "@/pages/Home/Home";
 import { Onboarding } from "@/pages/Onboarding/Onboarding";
 import { Player } from "@/pages/Player/Player";
 import { Profile } from "@/pages/Profile/Profile";
+import { ProgramExplore } from "@/pages/ProgramExplore/ProgramExplore";
 import { SelectChild } from "@/pages/SelectChild/SelectChild";
 import { Splash } from "@/pages/Splash/Splash";
 import { Upgrade } from "@/pages/Upgrade/Upgrade";
+import { UpdateToast } from "@/components/UpdateToast/UpdateToast";
 
 function App() {
   return (
@@ -19,12 +21,14 @@ function App() {
         <Route path="/upgrade" element={<Upgrade />} />
         <Route element={<RequireChild />}>
           <Route path="/home" element={<Home />} />
+          <Route path="/program/:programId" element={<ProgramExplore />} />
           <Route path="/story/:id" element={<Player />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/dashboard" element={<Dashboard />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      <UpdateToast />
     </HashRouter>
   );
 }

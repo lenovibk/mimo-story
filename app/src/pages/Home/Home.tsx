@@ -1,41 +1,35 @@
 import { AnimatePresence, motion } from "framer-motion";
-import type { ComponentType, SVGProps } from "react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AdBanner } from "@/components/AdBanner/AdBanner";
-import { CircleButton, SolidPillButton } from "@/components/Button/Button";
+import { SolidPillButton } from "@/components/Button/Button";
+import { IconChevronRight, IconFamily, IconFace, IconHeart, IconSettings, IconStar } from "@/components/Icon/Icon";
 import {
-  IconChevronLeft,
-  IconChevronRight,
-  IconFamily,
-  IconFace,
-  IconHeart,
-  IconSettings,
-  IconStar,
-} from "@/components/Icon/Icon";
+  ItemsRail,
+  SectionCard,
+  SectionConnector,
+  sectionTitleStyle,
+  useEdgeScrollState,
+} from "@/components/ItemsRail/ItemsRail";
 import { Logo } from "@/components/Logo/Logo";
 import { SkyBackground } from "@/components/SkyBackground/SkyBackground";
 import { StoryCard } from "@/components/StoryCard/StoryCard";
-import { getCategoryIcon } from "@/data/categoryVisuals";
+import { StoryCardListRow } from "@/components/StoryCard/StoryCardListRow";
+import { StoryCardWide } from "@/components/StoryCard/StoryCardWide";
 import { getProgramIcon } from "@/data/programVisuals";
 import { useEnsureCatalogLoaded } from "@/hooks/useEnsureCatalogLoaded";
 import { useAppStore } from "@/store/useAppStore";
 import { useAuthStore } from "@/store/useAuthStore";
 import { useCatalogStore } from "@/store/useCatalogStore";
 import { useFavoritesStore } from "@/store/useFavoritesStore";
-import type { Category, Program, Story, StoryCategory } from "@/types";
+import type { Program, Story } from "@/types";
 import { recommendStories } from "@/utils/recommend";
-import { playTick, playWhoosh } from "@/utils/sound";
-
-/** Fades whichever edge still has more content to scroll to, so a rail never looks
- * like it just ends mid-list when there's more just out of view. */
-function edgeFadeStyle(atStart: boolean, atEnd: boolean, fade = 28) {
-  const gradient = `linear-gradient(to right, ${atStart ? "black" : "transparent"} 0px, black ${fade}px, black calc(100% - ${fade}px), ${atEnd ? "black" : "transparent"} 100%)`;
-  return { maskImage: gradient, WebkitMaskImage: gradient };
-}
+import { playTick } from "@/utils/sound";
 
 /** A colorful sticker-badge + bold label used to head every rail/section, so each one reads
- * as its own distinct "shelf" instead of a plain white heading blending into the next. */
+ * as its own distinct "shelf" instead of a plain white heading blending into the next. Sits on
+ * its own pastel card now, so the label reads in a dark ink color like ProgramHeading rather
+ * than the drop-shadowed white this used before every rail got a card of its own. */
 function SectionTitle({ emoji, title, accent }: { emoji: string; title: string; accent: string }) {
   return (
     <h2 className="flex items-center gap-2.5">
@@ -50,7 +44,10 @@ function SectionTitle({ emoji, title, accent }: { emoji: string; title: string; 
       >
         {emoji}
       </motion.span>
-      <span className="font-heading text-lg font-extrabold tracking-tight text-white drop-shadow-[0_2px_2px_rgba(0,0,0,0.25)] sm:text-xl">
+      <span
+        className="font-heading text-lg font-extrabold tracking-tight sm:text-xl"
+        style={sectionTitleStyle(`color-mix(in srgb, ${accent} 65%, #2b2540)`)}
+      >
         {title}
       </span>
     </h2>
@@ -58,7 +55,9 @@ function SectionTitle({ emoji, title, accent }: { emoji: string; title: string; 
 }
 
 /** Same sticker-badge language as SectionTitle, but for a program's own icon component
- * instead of an emoji - each program row is headed by its own icon and color. */
+ * instead of an emoji - each program row is headed by its own icon and color. Sits on the
+ * program's own pastel card now (not the open sky background), so the label reads in a dark
+ * ink color instead of the drop-shadowed white used everywhere else on this page. */
 function ProgramHeading({ program }: { program: Program }) {
   const Icon = getProgramIcon(program.icon);
   return (
@@ -74,7 +73,10 @@ function ProgramHeading({ program }: { program: Program }) {
       >
         <Icon className="h-5 w-5" />
       </motion.span>
-      <span className="font-heading text-lg font-extrabold tracking-tight text-white drop-shadow-[0_2px_2px_rgba(0,0,0,0.25)] sm:text-xl">
+      <span
+        className="font-heading text-lg font-extrabold tracking-tight sm:text-xl"
+        style={sectionTitleStyle(`color-mix(in srgb, ${program.color} 65%, #2b2540)`)}
+      >
         {program.label}
       </span>
     </h2>
@@ -119,247 +121,12 @@ function HeaderMenuButton({
   );
 }
 
-/** Tracks scroll-edge state for a horizontally-scrolling rail, shared by every rail on
- * this page so each one fades/hints consistently without duplicating the wiring. */
-function useEdgeScrollState(items: unknown[]) {
-  const railRef = useRef<HTMLDivElement>(null);
-  const [edge, setEdge] = useState({ atStart: true, atEnd: true });
-
-  const updateEdge = () => {
-    const rail = railRef.current;
-    if (!rail) return;
-    setEdge({
-      atStart: rail.scrollLeft <= 4,
-      atEnd: rail.scrollLeft >= rail.scrollWidth - rail.clientWidth - 4,
-    });
-  };
-
-  useEffect(() => {
-    updateEdge();
-    window.addEventListener("resize", updateEdge);
-    return () => window.removeEventListener("resize", updateEdge);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [items]);
-
-  return { railRef, edge, updateEdge };
-}
-
-/** The scrollable strip of story cards itself, without a header - reused by the plain
- * StoryRail (which adds a title above it) and by each per-program row.
- *
- * `interactive` turns on the original "hero carousel" feel: click-and-drag panning on
- * desktop, mouse-wheel support, a centered card that highlights and ticks as it changes,
- * and hover-only prev/next arrows that whoosh. Off by default (compact secondary rails
- * like Continue Watching never had this); ProgramRow's main lesson rail turns it on. */
-function ItemsRail({
-  railRef,
-  edge,
-  onScroll,
-  items,
-  onSelect,
-  getProgress,
-  isFavorite,
-  onToggleFavorite,
-  size = "compact",
-  interactive = false,
-}: {
-  railRef: React.RefObject<HTMLDivElement | null>;
-  edge: { atStart: boolean; atEnd: boolean };
-  onScroll: () => void;
-  items: Story[];
-  onSelect: (story: Story) => void;
-  getProgress?: (story: Story) => number | undefined;
-  isFavorite?: (story: Story) => boolean;
-  onToggleFavorite?: (story: Story) => void;
-  size?: "default" | "compact";
-  interactive?: boolean;
-}) {
-  const cardRefs = useRef(new Map<string, HTMLDivElement>());
-  const [activeId, setActiveId] = useState(items[0]?.id);
-  const [isDragging, setIsDragging] = useState(false);
-  // `down`: a mouse button is held. `dragging`: movement crossed the drag threshold, so we're
-  // actively panning the rail and should swallow the click that follows.
-  const dragState = useRef({ down: false, dragging: false, startX: 0, startScrollLeft: 0 });
-  const suppressNextClick = useRef(false);
-  const rafRef = useRef<number>(0);
-  const DRAG_THRESHOLD = 10;
-
-  // Recompute which card is centered from actual DOM positions (robust to responsive
-  // card widths/gaps instead of hardcoding sizes).
-  const updateActive = () => {
-    const rail = railRef.current;
-    if (!rail) return;
-    const center = rail.getBoundingClientRect().left + rail.clientWidth / 2;
-    let closestId: string | undefined;
-    let closestDist = Infinity;
-    for (const story of items) {
-      const el = cardRefs.current.get(story.id);
-      if (!el) continue;
-      const rect = el.getBoundingClientRect();
-      const dist = Math.abs(rect.left + rect.width / 2 - center);
-      if (dist < closestDist) {
-        closestDist = dist;
-        closestId = story.id;
-      }
-    }
-    if (closestId) {
-      setActiveId((prev) => {
-        if (prev !== closestId) playTick();
-        return closestId;
-      });
-    }
-  };
-
-  useEffect(() => {
-    if (!interactive) return;
-    if (railRef.current) railRef.current.scrollLeft = 0;
-    setActiveId(items[0]?.id);
-    updateActive();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [items, interactive]);
-
-  const handleScroll = () => {
-    onScroll();
-    if (!interactive) return;
-    cancelAnimationFrame(rafRef.current);
-    rafRef.current = requestAnimationFrame(updateActive);
-  };
-
-  const handleWheel: React.WheelEventHandler<HTMLDivElement> = (e) => {
-    const rail = railRef.current;
-    if (!rail) return;
-    // Let a normal (vertical) mouse wheel drive the horizontal rail too.
-    rail.scrollLeft += Math.abs(e.deltaY) > Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
-  };
-
-  // Click-and-drag scrolling for desktop mice (touch/pen keep native momentum scrolling).
-  // Dragging only actually engages once the pointer moves past DRAG_THRESHOLD, so a plain
-  // click never grabs pointer capture or nudges scrollLeft.
-  const handlePointerDown: React.PointerEventHandler<HTMLDivElement> = (e) => {
-    if (e.pointerType !== "mouse") return;
-    const rail = railRef.current;
-    if (!rail) return;
-    dragState.current = { down: true, dragging: false, startX: e.clientX, startScrollLeft: rail.scrollLeft };
-  };
-
-  const handlePointerMove: React.PointerEventHandler<HTMLDivElement> = (e) => {
-    const rail = railRef.current;
-    const drag = dragState.current;
-    if (!rail || !drag.down) return;
-    const dx = e.clientX - drag.startX;
-
-    if (!drag.dragging) {
-      if (Math.abs(dx) < DRAG_THRESHOLD) return;
-      drag.dragging = true;
-      rail.setPointerCapture(e.pointerId);
-      setIsDragging(true);
-    }
-
-    rail.scrollLeft = drag.startScrollLeft - dx;
-  };
-
-  const endDrag: React.PointerEventHandler<HTMLDivElement> = (e) => {
-    if (e.pointerType !== "mouse") return;
-    dragState.current.down = false;
-    if (dragState.current.dragging) {
-      dragState.current.dragging = false;
-      suppressNextClick.current = true;
-    }
-    setIsDragging(false);
-  };
-
-  // Swallow the click that follows a real drag so it doesn't also open the story.
-  const handleClickCapture: React.MouseEventHandler<HTMLDivElement> = (e) => {
-    if (suppressNextClick.current) {
-      e.stopPropagation();
-      e.preventDefault();
-      suppressNextClick.current = false;
-    }
-  };
-
-  const goTo = (direction: 1 | -1) => {
-    const index = items.findIndex((s) => s.id === activeId);
-    const target = items[Math.min(Math.max(index + direction, 0), items.length - 1)];
-    const el = target && cardRefs.current.get(target.id);
-    el?.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
-    playWhoosh(direction);
-  };
-
-  return (
-    <div className="relative">
-      {interactive && (
-        <div className="pointer-events-none absolute inset-0 z-10 hidden can-hover:block">
-          <CircleButton
-            icon={<IconChevronLeft className="h-7 w-7" />}
-            color="white"
-            size={56}
-            ariaLabel="Trước"
-            onClick={() => goTo(-1)}
-            disabled={edge.atStart}
-            className="pointer-events-auto absolute top-1/2 left-1 -translate-y-1/2"
-          />
-          <CircleButton
-            icon={<IconChevronRight className="h-7 w-7" />}
-            color="white"
-            size={56}
-            ariaLabel="Tiếp theo"
-            onClick={() => goTo(1)}
-            disabled={edge.atEnd}
-            className="pointer-events-auto absolute top-1/2 right-1 -translate-y-1/2"
-          />
-        </div>
-      )}
-
-      <div
-        ref={railRef}
-        onScroll={handleScroll}
-        onWheel={interactive ? handleWheel : undefined}
-        onPointerDown={interactive ? handlePointerDown : undefined}
-        onPointerMove={interactive ? handlePointerMove : undefined}
-        onPointerUp={interactive ? endDrag : undefined}
-        onPointerLeave={interactive ? endDrag : undefined}
-        onPointerCancel={interactive ? endDrag : undefined}
-        onClickCapture={interactive ? handleClickCapture : undefined}
-        className={
-          interactive
-            ? `no-select no-scrollbar safe-px flex snap-x snap-proximity gap-5 overflow-x-auto pt-3 pb-4 sm:gap-7 landscape-compact:gap-3 landscape-compact:pt-2 ${
-                isDragging ? "cursor-grabbing" : "cursor-grab"
-              }`
-            : "no-scrollbar safe-px flex gap-4 overflow-x-auto pt-3 pb-2"
-        }
-        style={{
-          ...(interactive ? { scrollPadding: "0 8px" } : { scrollSnapType: "x proximity" as const }),
-          ...edgeFadeStyle(edge.atStart, edge.atEnd, interactive ? 32 : 28),
-        }}
-      >
-        {items.map((story) => (
-          <div
-            key={story.id}
-            ref={(el) => {
-              if (!interactive) return;
-              if (el) cardRefs.current.set(story.id, el);
-              else cardRefs.current.delete(story.id);
-            }}
-            style={{ scrollSnapAlign: "start" }}
-          >
-            <StoryCard
-              story={story}
-              onSelect={onSelect}
-              size={size}
-              isActive={interactive ? story.id === activeId : true}
-              progress={getProgress?.(story)}
-              favorite={isFavorite?.(story)}
-              onToggleFavorite={onToggleFavorite}
-            />
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-/** A horizontally-scrolling row of story cards with a title above it. */
+/** A horizontally-scrolling row of story cards with a title above it, inside the same pastel
+ * card shell every other shelf on the page uses. `renderItem` swaps in a different item shape
+ * (progress ring, wide editorial card, list row, ...) so this rail reads as a distinct "kind"
+ * of shelf instead of just another color of the same portrait-card rail. */
 function StoryRail({
+  index,
   title,
   emoji,
   accent,
@@ -368,7 +135,9 @@ function StoryRail({
   getProgress,
   isFavorite,
   onToggleFavorite,
+  renderItem,
 }: {
+  index: number;
   title: string;
   emoji: string;
   accent: string;
@@ -377,14 +146,15 @@ function StoryRail({
   getProgress?: (story: Story) => number | undefined;
   isFavorite?: (story: Story) => boolean;
   onToggleFavorite?: (story: Story) => void;
+  renderItem?: (story: Story, isActive: boolean) => React.ReactNode;
 }) {
   const { railRef, edge, updateEdge } = useEdgeScrollState(items);
 
   if (items.length === 0) return null;
 
   return (
-    <section className="pt-8 landscape-compact:pt-4">
-      <div className="safe-px mb-3">
+    <SectionCard index={index} color={accent}>
+      <div className="mb-1">
         <SectionTitle emoji={emoji} title={title} accent={accent} />
       </div>
       <ItemsRail
@@ -396,116 +166,48 @@ function StoryRail({
         getProgress={getProgress}
         isFavorite={isFavorite}
         onToggleFavorite={onToggleFavorite}
+        edgePad="card"
+        renderItem={renderItem}
       />
-    </section>
+    </SectionCard>
   );
 }
 
-interface ChipItem {
-  id: StoryCategory | null;
-  label: string;
-  Icon: ComponentType<SVGProps<SVGSVGElement>>;
-  color: string;
-}
-
-/** Three different chip treatments for a program's category filter, picked by row index so
- * consecutive program rows never look like copies of each other: stacked circle badges,
- * inline color pills, and flat white cards. Same interaction, different costume. */
-function CategoryChipRow({
-  variant,
-  items,
-  active,
-  onChange,
-}: {
-  variant: number;
-  items: ChipItem[];
-  active: StoryCategory | null;
-  onChange: (id: StoryCategory | null) => void;
-}) {
+/** The pill that replaces inline category filtering on a program's card - tapping it is
+ * the only way into that program's categories now, via a dedicated full-screen browser
+ * (see ProgramExplore), so every program card stays a clean title + two-card teaser instead
+ * of a cluttered row of filter chips. */
+function ExploreButton({ color, onClick }: { color: string; onClick: () => void }) {
   return (
-    <div className="no-scrollbar flex gap-2.5 overflow-x-auto py-1">
-      {items.map((item) => {
-        const isActive = active === item.id;
-        const Icon = item.Icon;
-        const key = item.id ?? "all";
-
-        if (variant === 1) {
-          return (
-            <motion.button
-              key={key}
-              type="button"
-              whileTap={{ scale: 0.94 }}
-              onClick={() => onChange(item.id)}
-              className={`flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-2 shadow-sm ring-2 transition-colors ${
-                isActive ? "ring-white" : "ring-transparent"
-              }`}
-              style={{ backgroundColor: isActive ? item.color : `${item.color}26` }}
-            >
-              <Icon className={`h-4 w-4 ${isActive ? "text-white" : "text-white/85"}`} />
-              <span
-                className={`font-heading text-xs font-bold whitespace-nowrap ${isActive ? "text-white" : "text-white/85"}`}
-              >
-                {item.label}
-              </span>
-            </motion.button>
-          );
-        }
-
-        if (variant === 2) {
-          return (
-            <motion.button
-              key={key}
-              type="button"
-              whileTap={{ scale: 0.94 }}
-              onClick={() => onChange(item.id)}
-              className={`flex shrink-0 items-center gap-2 rounded-2xl px-3 py-2 shadow-md ring-2 transition-all ${
-                isActive ? "bg-white ring-white" : "bg-white/70 ring-transparent"
-              }`}
-            >
-              <span
-                className="flex h-7 w-7 items-center justify-center rounded-lg text-white"
-                style={{ backgroundColor: item.color }}
-              >
-                <Icon className="h-4 w-4" />
-              </span>
-              <span className="font-heading text-xs font-bold whitespace-nowrap text-slate-700">{item.label}</span>
-            </motion.button>
-          );
-        }
-
-        return (
-          <button key={key} type="button" onClick={() => onChange(item.id)} className="flex w-16 shrink-0 flex-col items-center gap-1">
-            <motion.span
-              whileTap={{ scale: 0.92 }}
-              className={`flex h-12 w-12 items-center justify-center rounded-full text-white shadow-md ring-4 transition-all ${
-                isActive ? "scale-105 ring-white" : "ring-white/40"
-              }`}
-              style={{ backgroundColor: item.color }}
-            >
-              <Icon className="h-6 w-6" />
-            </motion.span>
-            <span
-              className={`text-center font-heading text-[11px] leading-tight font-bold drop-shadow-sm ${
-                isActive ? "text-[#FFD54A]" : "text-white"
-              }`}
-            >
-              {item.label}
-            </span>
-          </button>
-        );
-      })}
-    </div>
+    <motion.button
+      type="button"
+      whileTap={{ scale: 0.94 }}
+      onClick={onClick}
+      className="ml-auto flex shrink-0 items-center gap-1.5 rounded-full border-2 border-dashed bg-white/85 py-1.5 pr-2.5 pl-1.5 shadow-sm"
+      style={{ borderColor: `${color}90` }}
+    >
+      <span
+        className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-white"
+        style={{ backgroundColor: color }}
+      >
+        <IconStar className="h-3.5 w-3.5" />
+      </span>
+      <span className="font-heading text-xs font-bold whitespace-nowrap" style={{ color }}>
+        Khám phá
+      </span>
+      <IconChevronRight className="h-3.5 w-3.5" style={{ color }} />
+    </motion.button>
   );
 }
 
-/** One program's own shelf: its heading, its category filter (styled differently per row so
- * the page doesn't read as one long repeating list), and its story rail. Renders nothing when
- * the program has no stories at all, so an empty program never shows up as a dead section. */
+/** One program's own module: an icon + name on the left, its category filter pills on the
+ * right (same row), and its story rail below - all inside a single rounded pastel card so
+ * each program reads as its own self-contained shelf. Renders nothing when the program has
+ * no stories at all, so an empty program never shows up as a dead card. */
 function ProgramRow({
   program,
   index,
   stories,
-  allCategories,
   onSelect,
   getProgress,
   isFavorite,
@@ -514,60 +216,39 @@ function ProgramRow({
   program: Program;
   index: number;
   stories: Story[];
-  allCategories: Category[];
   onSelect: (story: Story) => void;
   getProgress?: (story: Story) => number | undefined;
   isFavorite?: (story: Story) => boolean;
   onToggleFavorite?: (story: Story) => void;
 }) {
-  const [category, setCategory] = useState<StoryCategory | null>(null);
-  const visible = useMemo(
-    () => (category ? stories.filter((s) => s.category === category) : stories),
-    [stories, category]
-  );
-  const { railRef, edge, updateEdge } = useEdgeScrollState(visible);
+  const navigate = useNavigate();
+  const { railRef, edge, updateEdge } = useEdgeScrollState(stories);
 
   if (stories.length === 0) return null;
 
-  const programCategories = allCategories.filter((c) => stories.some((s) => s.category === c.id));
-  const variant = index % 3;
-  const chipItems: ChipItem[] = [
-    { id: null, label: "Tất cả", Icon: IconStar, color: program.color },
-    ...programCategories.map((c) => ({ id: c.id, label: c.label, Icon: getCategoryIcon(c.icon), color: c.color })),
-  ];
-
   return (
-    <section className="relative pt-8 landscape-compact:pt-4">
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0"
-        style={{ background: `linear-gradient(180deg, ${program.color}20 0%, ${program.color}00 80%)` }}
-      />
-
-      <div className="safe-px mb-2 flex items-center gap-4">
-        <div className="shrink-0">
+    <SectionCard index={index} color={program.color}>
+      <div className="mb-1 flex items-center gap-3">
+        <div className="min-w-0 shrink-0">
           <ProgramHeading program={program} />
         </div>
-        {programCategories.length > 1 && (
-          <div className="min-w-0 flex-1">
-            <CategoryChipRow variant={variant} items={chipItems} active={category} onChange={setCategory} />
-          </div>
-        )}
+        <ExploreButton color={program.color} onClick={() => navigate(`/program/${program.id}`)} />
       </div>
 
       <ItemsRail
         railRef={railRef}
         edge={edge}
         onScroll={updateEdge}
-        items={visible}
+        items={stories}
         onSelect={onSelect}
         getProgress={getProgress}
         isFavorite={isFavorite}
         onToggleFavorite={onToggleFavorite}
-        size="default"
+        size="compact"
         interactive
+        edgePad="card"
       />
-    </section>
+    </SectionCard>
   );
 }
 
@@ -619,7 +300,7 @@ function HomeGreeting({ name, gender }: { name: string; gender: "boy" | "girl" }
       className="safe-px relative mt-4"
     >
       <div
-        className="relative flex items-center gap-3 overflow-hidden rounded-[28px] py-3 pr-5 pl-3 shadow-lg"
+        className="relative flex items-center gap-3 overflow-hidden rounded-[28px] border-2 border-dashed border-white py-3 pr-5 pl-3 shadow-lg"
         style={{ background: `linear-gradient(135deg, ${greeting.accent}, #FF92C2)` }}
       >
         {GREETING_SPARKLES.map((s, i) => (
@@ -681,7 +362,6 @@ export function Home() {
   const navigate = useNavigate();
   useEnsureCatalogLoaded();
   const stories = useCatalogStore((s) => s.stories);
-  const storyCategories = useCatalogStore((s) => s.categories);
   const programs = useCatalogStore((s) => s.programs);
   const activeChildId = useAuthStore((s) => s.activeChildId)!;
   const child = useAuthStore((s) => s.children.find((c) => c.id === activeChildId));
@@ -713,17 +393,6 @@ export function Home() {
   const isFavorite = (story: Story) => favoriteIds.includes(story.id);
   const handleToggleFavorite = (story: Story) => void toggleFavorite(activeChildId, story.id);
 
-  const continueStories = useMemo(() => {
-    return stories
-      .map((story) => ({ story, entry: storyProgress[story.id] }))
-      .filter(
-        (x): x is { story: Story; entry: NonNullable<(typeof storyProgress)[string]> } =>
-          !!x.entry && x.entry.ratio > 0.02 && x.entry.ratio < 0.97
-      )
-      .sort((a, b) => b.entry.updatedAt - a.entry.updatedAt)
-      .slice(0, 12);
-  }, [stories, storyProgress]);
-
   const recentlyWatchedStories = useMemo(() => {
     return stories
       .map((story) => ({ story, entry: storyProgress[story.id] }))
@@ -747,16 +416,74 @@ export function Home() {
 
   const newStories = useMemo(() => stories.filter((s) => s.tags?.includes("new")), [stories]);
 
+  // Each of these secondary shelves gets its own item shape (progress ring, wide editorial
+  // card, list row, ...) instead of every rail using the same portrait StoryCard, so the page
+  // reads as several different *kinds* of shelf, not just the same rail repeated in new colors.
+  // Filtered to non-empty up front (rather than inside StoryRail) so the `index` handed to each
+  // one - and therefore which ones get a connector drawn above them - stays contiguous.
+  const utilityRails = [
+    {
+      key: "recommended",
+      title: "Được đề xuất cho bạn",
+      emoji: "✨",
+      accent: "#B79CFF",
+      items: recommendedStories,
+      renderItem: (story: Story) => (
+        <StoryCardWide story={story} onSelect={handleSelect} favorite={isFavorite(story)} onToggleFavorite={handleToggleFavorite} />
+      ),
+    },
+    {
+      key: "favorites",
+      title: "Yêu thích ❤️",
+      emoji: "❤️",
+      accent: "#FF7A7A",
+      items: favoriteStories,
+      renderItem: (story: Story) => (
+        <StoryCard
+          story={story}
+          shape="square"
+          onSelect={handleSelect}
+          favorite={isFavorite(story)}
+          onToggleFavorite={handleToggleFavorite}
+        />
+      ),
+    },
+    {
+      key: "recent",
+      title: "Xem gần đây",
+      emoji: "🕒",
+      accent: "#6FE0C8",
+      items: recentlyWatchedStories,
+      renderItem: (story: Story) => (
+        <StoryCardListRow
+          story={story}
+          onSelect={handleSelect}
+          progress={storyProgress[story.id]?.ratio}
+          favorite={isFavorite(story)}
+          onToggleFavorite={handleToggleFavorite}
+        />
+      ),
+    },
+    {
+      key: "new",
+      title: "Mới",
+      emoji: "🌸",
+      accent: "#FF92C2",
+      items: newStories,
+      renderItem: undefined,
+    },
+  ].filter((rail) => rail.items.length > 0);
+
   return (
     <div className="relative h-full w-full overflow-hidden">
       <SkyBackground />
 
-      <div className="no-scrollbar relative z-10 h-full overflow-y-auto overscroll-contain">
+      <div className="relative z-10 flex h-full w-full flex-col overflow-hidden">
         <motion.header
           initial={{ opacity: 0, y: -16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, ease: "easeOut" }}
-          className="safe-px safe-pt flex items-start justify-between gap-4"
+          className="safe-px safe-pt shrink-0 flex items-start justify-between gap-4"
         >
           <Logo />
           <div className="flex items-start gap-3 sm:gap-4">
@@ -784,123 +511,95 @@ export function Home() {
           </div>
         </motion.header>
 
-        {child && <HomeGreeting name={child.name} gender={child.gender} />}
+        {/* Only the header above stays put - the greeting scrolls away with everything
+            else, and the grass/decoration painted into the sky background never moves
+            either way since it lives outside this scroller entirely. */}
+        <div className="no-scrollbar relative z-10 min-h-0 flex-1 overflow-y-auto overscroll-contain">
+          {child && <HomeGreeting name={child.name} gender={child.gender} />}
 
-        {programSections.map(({ program, stories: rowStories }, i) => (
-          <ProgramRow
-            key={program.id}
-            program={program}
-            index={i}
-            stories={rowStories}
-            allCategories={storyCategories}
-            onSelect={handleSelect}
-            getProgress={(story) => storyProgress[story.id]?.ratio}
-            isFavorite={isFavorite}
-            onToggleFavorite={handleToggleFavorite}
-          />
-        ))}
+          {programSections.length > 0 && (
+            <SectionConnector index={0} color={programSections[0].program.color} sticker="✈️" />
+          )}
 
-        <AdBanner age={child?.age} />
+          {programSections.map(({ program, stories: rowStories }, i) => (
+            <ProgramRow
+              key={program.id}
+              program={program}
+              index={i}
+              stories={rowStories}
+              onSelect={handleSelect}
+              getProgress={(story) => storyProgress[story.id]?.ratio}
+              isFavorite={isFavorite}
+              onToggleFavorite={handleToggleFavorite}
+            />
+          ))}
 
-        <StoryRail
-          title="Đang học dở"
-          emoji="⭐"
-          accent="#FFD54A"
-          items={continueStories.map((x) => x.story)}
-          onSelect={handleSelect}
-          getProgress={(story) => storyProgress[story.id]?.ratio}
-          isFavorite={isFavorite}
-          onToggleFavorite={handleToggleFavorite}
-        />
+          <AdBanner age={child?.age} />
 
-        <StoryRail
-          title="Được đề xuất cho bạn"
-          emoji="✨"
-          accent="#B79CFF"
-          items={recommendedStories}
-          onSelect={handleSelect}
-          isFavorite={isFavorite}
-          onToggleFavorite={handleToggleFavorite}
-        />
+          {utilityRails.map((rail, i) => (
+            <StoryRail
+              key={rail.key}
+              index={i}
+              title={rail.title}
+              emoji={rail.emoji}
+              accent={rail.accent}
+              items={rail.items}
+              onSelect={handleSelect}
+              isFavorite={isFavorite}
+              onToggleFavorite={handleToggleFavorite}
+              renderItem={rail.renderItem}
+            />
+          ))}
 
-        <StoryRail
-          title="Yêu thích"
-          emoji="❤️"
-          accent="#FF7A7A"
-          items={favoriteStories}
-          onSelect={handleSelect}
-          isFavorite={isFavorite}
-          onToggleFavorite={handleToggleFavorite}
-        />
-
-        <StoryRail
-          title="Xem gần đây"
-          emoji="🕒"
-          accent="#6FE0C8"
-          items={recentlyWatchedStories}
-          onSelect={handleSelect}
-          isFavorite={isFavorite}
-          onToggleFavorite={handleToggleFavorite}
-        />
-
-        <StoryRail
-          title="Truyện mới"
-          emoji="🌸"
-          accent="#FF92C2"
-          items={newStories}
-          onSelect={handleSelect}
-          isFavorite={isFavorite}
-          onToggleFavorite={handleToggleFavorite}
-        />
-
-        <motion.footer
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.1, ease: "easeOut" }}
-          className="safe-pb text-center landscape-compact:pb-4"
-        >
-          <p className="mx-auto inline-flex items-center gap-2 rounded-full bg-white/85 px-6 py-2 font-heading text-sm font-semibold text-slate-600 shadow-md">
-            <IconStar className="h-4 w-4 text-[#FFD54A]" />
-            Học mà chơi - Chơi mà học - Bé vui mỗi ngày!
-            <IconHeart className="h-4 w-4 text-[#FF92C2]" />
-          </p>
-        </motion.footer>
-      </div>
-
-      <AnimatePresence>
-        {settingsOpen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="absolute inset-0 z-30 flex items-center justify-center bg-black/40 px-6"
-            onClick={() => setSettingsOpen(false)}
+          <motion.footer
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.1, ease: "easeOut" }}
+            className="safe-pb pt-8 text-center landscape-compact:pb-4"
           >
+            <p className="mx-auto inline-flex items-center gap-2 rounded-full bg-white/85 px-6 py-2 font-heading text-sm font-semibold text-slate-600 shadow-md">
+              <IconStar className="h-4 w-4 text-[#FFD54A]" />
+              Học mà chơi - Chơi mà học - Bé vui mỗi ngày!
+              <IconHeart className="h-4 w-4 text-[#FF92C2]" />
+            </p>
+          </motion.footer>
+        </div>
+
+        <AnimatePresence>
+          {settingsOpen && (
             <motion.div
-              initial={{ scale: 0.7, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.7, opacity: 0 }}
-              transition={{ type: "spring", stiffness: 280, damping: 20 }}
-              onClick={(e) => e.stopPropagation()}
-              className="flex w-full max-w-sm flex-col items-center gap-5 rounded-[28px] bg-white p-8 text-center shadow-2xl"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 z-30 flex items-center justify-center bg-black/40 px-6"
+              onClick={() => setSettingsOpen(false)}
             >
-              <Logo />
-              <p className="font-body text-slate-500">MimoKids - phiên bản 1.0</p>
-              <p className="flex items-center gap-2 font-heading text-lg font-bold text-slate-700">
-                <IconStar className="h-5 w-5 text-[#FFD54A]" />
-                {stars} sao đã thu thập
-              </p>
-              <SolidPillButton
-                label="Đóng"
-                color="primary"
-                ariaLabel="Close settings"
-                onClick={() => setSettingsOpen(false)}
-                className="px-8 py-3 text-lg"
-              />
+              <motion.div
+                initial={{ scale: 0.7, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.7, opacity: 0 }}
+                transition={{ type: "spring", stiffness: 280, damping: 20 }}
+                onClick={(e) => e.stopPropagation()}
+                className="flex w-full max-w-sm flex-col items-center gap-5 rounded-[28px] bg-white p-8 text-center shadow-2xl"
+              >
+                <Logo />
+                <p className="font-body text-slate-500">MimoKids - phiên bản 1.0</p>
+                <p className="flex items-center gap-2 font-heading text-lg font-bold text-slate-700">
+                  <IconStar className="h-5 w-5 text-[#FFD54A]" />
+                  {stars} sao đã thu thập
+                </p>
+                <SolidPillButton
+                  label="Đóng"
+                  color="primary"
+                  ariaLabel="Close settings"
+                  onClick={() => setSettingsOpen(false)}
+                  className="px-8 py-3 text-lg"
+                />
+              </motion.div>
             </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          )}
+        </AnimatePresence>
+      </div>
     </div>
   );
 }

@@ -1,11 +1,14 @@
 // Minimal service worker: just enough for "Add to Home Screen" installability
 // plus an offline fallback for the app shell. Deliberately network-first so it
 // never fights Vite's dev server / HMR, and never touches story video/audio.
-const CACHE_NAME = "mimokids-shell-v4";
+const CACHE_NAME = "mimokids-shell-v5";
 const SHELL_URLS = ["/", "/manifest.webmanifest", "/icons/icon-192.png?v=4", "/icons/icon-512.png?v=4"];
 
 self.addEventListener("install", (event) => {
-  self.skipWaiting();
+  // Deliberately no self.skipWaiting() here: this SW sits in "waiting" state
+  // until the page asks it to take over (see message listener below), which
+  // gives the app a chance to show a "new version available" prompt instead
+  // of silently swapping the app shell under the user's feet.
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => cache.addAll(SHELL_URLS).catch(() => {}))
   );
@@ -18,6 +21,10 @@ self.addEventListener("activate", (event) => {
       .then((keys) => Promise.all(keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))))
       .then(() => self.clients.claim())
   );
+});
+
+self.addEventListener("message", (event) => {
+  if (event.data?.type === "SKIP_WAITING") self.skipWaiting();
 });
 
 self.addEventListener("fetch", (event) => {
