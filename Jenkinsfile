@@ -4,8 +4,11 @@
 //   - Docker + Docker Compose plugin (lệnh `docker compose ...`)
 //   - Quyền chạy docker của user chạy Jenkins (thường phải thêm user `jenkins`
 //     vào group `docker` trên máy chủ)
-//   - File server/.env (và server/.env.production khi deploy prod) đã tồn tại
-//     sẵn trên máy chủ, KHÔNG commit vào git (xem docs/jenkins-deploy.md)
+//   - 2 credential kiểu "Secret file" đã tạo trong Jenkins web UI:
+//       mimokids-server-env             -> nội dung server/.env
+//       mimokids-server-env-production  -> nội dung server/.env.production
+//     (chỉ bắt buộc khi ENVIRONMENT=production). Xem cách tạo ở
+//     docs/jenkins-deploy.md mục 4.
 //
 // Xem hướng dẫn kết nối Jenkins <-> GitHub tại docs/jenkins-deploy.md
 
@@ -43,21 +46,23 @@ pipeline {
             }
         }
 
-        stage('Sanity check env files') {
+        stage('Load env secrets') {
             steps {
-                // server/.env(.production) chứa secret nên không nằm trong git —
-                // pipeline chỉ kiểm tra là nó có mặt trên máy chủ, không tạo ra nó.
-                sh '''
-                    set -e
-                    if [ "${ENVIRONMENT}" = "production" ] && [ ! -f server/.env.production ]; then
-                        echo "Thiếu server/.env.production trên máy chủ Jenkins agent." >&2
-                        exit 1
-                    fi
-                    if [ ! -f server/.env ]; then
-                        echo "Thiếu server/.env trên máy chủ Jenkins agent." >&2
-                        exit 1
-                    fi
-                '''
+                // server/.env(.production) chứa secret nên không commit vào git.
+                // Thay vì phải SSH vào máy chủ để tạo file tay, secret được lưu
+                // trong Jenkins Credentials (kiểu "Secret file", tạo qua web UI —
+                // xem docs/jenkins-deploy.md mục 4) và Jenkins tự ghi ra workspace
+                // ở đây, ngay trước khi build.
+                withCredentials([file(credentialsId: 'mimokids-server-env', variable: 'ENV_FILE')]) {
+                    sh 'cp "$ENV_FILE" server/.env'
+                }
+                script {
+                    if (params.ENVIRONMENT == 'production') {
+                        withCredentials([file(credentialsId: 'mimokids-server-env-production', variable: 'ENV_FILE_PROD')]) {
+                            sh 'cp "$ENV_FILE_PROD" server/.env.production'
+                        }
+                    }
+                }
             }
         }
 

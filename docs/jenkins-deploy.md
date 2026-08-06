@@ -110,21 +110,68 @@ Nếu máy chủ Jenkins không có IP/domain public để GitHub gọi webhook 
   ngoài tạm thời rồi dùng Cách A/B như trên — chỉ nên dùng cho môi trường
   test, không khuyến khích cho production.
 
-## 4. Chuẩn bị secrets trên máy chủ (server/.env, server/.env.production)
+## 4. Chuẩn bị secrets qua Jenkins web UI (server/.env, server/.env.production)
 
-Pipeline **không** tạo các file `.env` — chúng chứa secret (JWT, mật khẩu DB,
-SMTP...) nên cố tình không nằm trong git. Trước khi chạy build lần đầu, tạo
-sẵn trên máy chủ nơi Jenkins/Docker chạy:
+`server/.env`/`server/.env.production` chứa secret (JWT, mật khẩu DB, SMTP...)
+nên cố tình không nằm trong git, và pipeline cũng không tự sinh ra chúng.
+Thay vì phải SSH vào máy chủ để tạo file tay, cách khuyến khích là lưu nội
+dung 2 file này vào **Jenkins Credentials** (loại **Secret file**) qua giao
+diện web — Jenkinsfile ([xem stage `Load env secrets`](../Jenkinsfile)) sẽ tự
+ghi chúng ra `server/.env`/`server/.env.production` trong workspace ngay
+trước khi build. Không cần plugin thêm, "Secret file" là loại credential có
+sẵn trong Jenkins core.
+
+### Bước 1 — Soạn nội dung file `.env` thật trên máy của bạn
+
+Trên máy cá nhân (không phải máy chủ Jenkins), tạo file tạm dựa trên
+[`server/.env.example`](../server/.env.example) và điền giá trị thật:
 
 ```bash
-cd /path/to/mimo-story   # workspace mà Jenkins checkout code vào
-cp server/.env.example server/.env
-# sửa các giá trị thật trong server/.env
+cp server/.env.example /tmp/mimokids-server.env
+# sửa các giá trị thật (JWT_SECRET, DATABASE_URL, SMTP...) trong file này
 
-# nếu deploy production (docker-compose.prod.yml overlay server/.env.production)
-cp server/.env.example server/.env.production
+cp server/.env.example /tmp/mimokids-server-production.env
 # sửa các giá trị thật cho production
 ```
+
+(2 file này chỉ dùng để upload lên Jenkins ở bước 2, xoá đi sau khi upload
+xong nếu muốn — không cần giữ lại và không commit vào git.)
+
+### Bước 2 — Upload lên Jenkins qua web UI
+
+1. Mở **Manage Jenkins → Credentials**.
+2. Chọn store **System → Global credentials (unrestricted)** → **Add
+   Credentials** (nút ở góc trên bên phải hoặc menu trái "Add Credentials").
+3. Điền:
+   - **Kind**: `Secret file`
+   - **File**: bấm **Choose File**, chọn `/tmp/mimokids-server.env` vừa tạo
+     ở Bước 1.
+   - **ID**: `mimokids-server-env` (đúng ID pipeline đang đọc, xem
+     [`Jenkinsfile`](../Jenkinsfile))
+   - **Description**: `MimoKids server/.env (dev/staging)`
+4. Bấm **Create**.
+5. Lặp lại bước 2–4 cho file production:
+   - **File**: `/tmp/mimokids-server-production.env`
+   - **ID**: `mimokids-server-env-production`
+   - **Description**: `MimoKids server/.env.production`
+
+Sau khi tạo xong, trang Credentials sẽ hiện 2 dòng `mimokids-server-env` và
+`mimokids-server-env-production` với loại **Secret file** — nội dung file
+được Jenkins mã hoá lưu trữ, không ai xem lại được qua UI (chỉ có thể thay
+thế bằng file mới nếu cần đổi secret sau này, bằng cách **Update** credential
+đó).
+
+### Bước 3 — Không cần chỉnh gì thêm trong job
+
+Job Pipeline đã trỏ tới `Jenkinsfile` trong repo (mục 2), và Jenkinsfile đã
+có sẵn stage `Load env secrets` đọc đúng 2 ID credential ở trên — không cần
+cấu hình gì thêm trong job. Chạy **Build Now** hoặc **Build with Parameters**
+là đủ.
+
+> Đổi secret sau này (ví dụ xoay `JWT_SECRET`): vào lại
+> **Manage Jenkins → Credentials**, bấm vào credential tương ứng →
+> **Update** → chọn file `.env` mới → **Save**. Lần build tiếp theo sẽ dùng
+> nội dung mới.
 
 Xem chi tiết từng biến trong [`server/.env.example`](../server/.env.example).
 
