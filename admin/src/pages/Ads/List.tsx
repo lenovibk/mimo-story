@@ -13,6 +13,12 @@ import { useToast } from "@/components/ui/Toast";
 import { useSelection } from "@/hooks/useSelection";
 import { BulkActionsBar, BulkActionButton, HeaderCheckbox, RowCheckbox } from "@/components/ui/BulkActionsBar";
 
+/** An ad counts as already converted once its image is .webp — matches what the
+ * server writes in assetConversions.ts. */
+function isAdConverted(ad: Ad) {
+  return ad.imageUrl.toLowerCase().endsWith(".webp");
+}
+
 export function AdsList() {
   const toast = useToast();
   const { confirm, dialog } = useConfirmDialog();
@@ -99,6 +105,25 @@ export function AdsList() {
     }
   };
 
+  // Only ads whose image isn't already .webp are eligible for bulk convert —
+  // mirrors the per-row button's visibility.
+  const convertibleSelectedIds = Array.from(selection.selected).filter((id) => {
+    const ad = ads.find((x) => x.id === id);
+    return !!ad && !isAdConverted(ad);
+  });
+
+  const handleBulkConvert = async () => {
+    const ids = convertibleSelectedIds;
+    if (ids.length === 0) return;
+    setBulkBusy(true);
+    const results = await Promise.allSettled(ids.map((id) => api.convertAdMedia(id)));
+    const succeededIds = ids.filter((_, i) => results[i].status === "fulfilled");
+    const failed = ids.length - succeededIds.length;
+    setBulkBusy(false);
+    if (failed > 0) toast.error(`Không thể thêm vào hàng đợi convert ${failed}/${ids.length} quảng cáo.`);
+    if (succeededIds.length > 0) toast.success(`Đã thêm ${succeededIds.length} quảng cáo vào hàng đợi nén lại.`);
+  };
+
   return (
     <div>
       <PageHeader
@@ -123,6 +148,12 @@ export function AdsList() {
             <BulkActionButton onClick={() => handleBulkActive(false)} disabled={bulkBusy}>
               Tắt
             </BulkActionButton>
+            {convertibleSelectedIds.length > 0 && (
+              <BulkActionButton onClick={handleBulkConvert} disabled={bulkBusy}>
+                <ArrowsClockwise size={14} className="mr-1 inline" />
+                Convert ({convertibleSelectedIds.length})
+              </BulkActionButton>
+            )}
             <BulkActionButton variant="danger" onClick={handleBulkDelete} disabled={bulkBusy}>
               Xoá đã chọn
             </BulkActionButton>
@@ -170,16 +201,18 @@ export function AdsList() {
                     <Link to={`/ads/${ad.id}`} className="mr-3 font-medium text-sky-600 hover:underline">
                       Sửa
                     </Link>
-                    <button
-                      type="button"
-                      onClick={() => handleConvert(ad.id)}
-                      disabled={convertingId === ad.id}
-                      title="Nén lại ảnh sang webp"
-                      className="mr-3 inline-flex items-center gap-1 font-medium text-sky-600 hover:underline disabled:opacity-40"
-                    >
-                      <ArrowsClockwise size={14} />
-                      Convert
-                    </button>
+                    {!isAdConverted(ad) && (
+                      <button
+                        type="button"
+                        onClick={() => handleConvert(ad.id)}
+                        disabled={convertingId === ad.id}
+                        title="Nén lại ảnh sang webp"
+                        className="mr-3 inline-flex items-center gap-1 font-medium text-sky-600 hover:underline disabled:opacity-40"
+                      >
+                        <ArrowsClockwise size={14} />
+                        Convert
+                      </button>
+                    )}
                     <button type="button" onClick={() => handleDelete(ad.id)} className="font-medium text-red-500 hover:underline">
                       Xoá
                     </button>

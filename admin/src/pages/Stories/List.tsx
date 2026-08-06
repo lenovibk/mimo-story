@@ -17,6 +17,14 @@ import { BulkActionsBar, BulkActionButton, HeaderCheckbox, RowCheckbox } from "@
 
 const PAGE_SIZE = 20;
 
+/** A story counts as already converted once its cover is .webp and its video (if any,
+ * self-hosted only) is .webm — matches what the server writes in assetConversions.ts. */
+function isStoryConverted(s: Story) {
+  const coverConverted = s.coverUrl.toLowerCase().endsWith(".webp");
+  const videoConverted = s.videoSourceType === "YOUTUBE" || !s.videoUrl || s.videoUrl.toLowerCase().endsWith(".webm");
+  return coverConverted && videoConverted;
+}
+
 export function StoriesList() {
   const toast = useToast();
   const { confirm, dialog } = useConfirmDialog();
@@ -123,6 +131,26 @@ export function StoriesList() {
     }
   };
 
+  // Only stories that can actually be re-encoded (self-hosted video, not already webp/webm)
+  // are eligible for bulk convert — mirrors the per-row button's visibility.
+  const convertibleSelectedIds = Array.from(selection.selected).filter((id) => {
+    const s = stories.find((x) => x.id === id);
+    return !!s && s.videoSourceType !== "YOUTUBE" && !isStoryConverted(s);
+  });
+
+  const handleBulkConvert = async () => {
+    const ids = convertibleSelectedIds;
+    if (ids.length === 0) return;
+    setBulkBusy(true);
+    const results = await Promise.allSettled(ids.map((id) => api.convertStoryMedia(id)));
+    const succeededIds = ids.filter((_, i) => results[i].status === "fulfilled");
+    const failed = ids.length - succeededIds.length;
+    setStories((prev) => prev.map((s) => (succeededIds.includes(s.id) ? { ...s, videoConverting: true } : s)));
+    setBulkBusy(false);
+    if (failed > 0) toast.error(`Không thể thêm vào hàng đợi convert ${failed}/${ids.length} bài học.`);
+    if (succeededIds.length > 0) toast.success(`Đã thêm ${succeededIds.length} bài học vào hàng đợi nén lại.`);
+  };
+
   return (
     <div>
       <PageHeader
@@ -189,6 +217,12 @@ export function StoriesList() {
             <BulkActionButton onClick={() => handleBulkPublish(false)} disabled={bulkBusy}>
               Ẩn
             </BulkActionButton>
+            {convertibleSelectedIds.length > 0 && (
+              <BulkActionButton onClick={handleBulkConvert} disabled={bulkBusy}>
+                <ArrowsClockwise size={14} className="mr-1 inline" />
+                Convert ({convertibleSelectedIds.length})
+              </BulkActionButton>
+            )}
             <BulkActionButton variant="danger" onClick={handleBulkDelete} disabled={bulkBusy}>
               Xoá đã chọn
             </BulkActionButton>
@@ -241,7 +275,7 @@ export function StoriesList() {
                       <Link to={`/stories/${s.id}`} className="mr-3 font-medium text-sky-600 hover:underline">
                         Sửa
                       </Link>
-                      {s.videoSourceType !== "YOUTUBE" && (
+                      {s.videoSourceType !== "YOUTUBE" && !isStoryConverted(s) && (
                         <button
                           type="button"
                           onClick={() => handleConvert(s.id)}
