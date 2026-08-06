@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import { api } from "@/services/api";
 import type { UserDetail } from "@/types";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Spinner } from "@/components/ui/Spinner";
 
 export function UserDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -17,15 +19,12 @@ export function UserDetailPage() {
       .finally(() => setLoading(false));
   }, [id]);
 
-  if (loading) return <p className="text-slate-500">Đang tải...</p>;
+  if (loading) return <Spinner />;
   if (!user) return <p className="text-slate-500">Không tìm thấy người dùng.</p>;
 
   return (
     <div className="w-full">
-      <Link to="/users" className="mb-4 inline-block text-sm text-sky-600 hover:underline">
-        ← Danh sách người dùng
-      </Link>
-      <h1 className="mb-6 text-2xl font-bold text-slate-800">{user.email ?? "Người dùng khách"}</h1>
+      <PageHeader title={user.email ?? "Người dùng khách"} backTo="/users" />
 
       <div className="mb-6 grid grid-cols-3 gap-4">
         <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">

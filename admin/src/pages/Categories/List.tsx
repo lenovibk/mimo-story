@@ -1,6 +1,13 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { api, ApiError } from "@/services/api";
 import type { Category } from "@/types";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Button } from "@/components/ui/Button";
+import { Spinner } from "@/components/ui/Spinner";
+import { useConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { useToast } from "@/components/ui/Toast";
+import { useSelection } from "@/hooks/useSelection";
+import { BulkActionsBar, BulkActionButton, HeaderCheckbox, RowCheckbox } from "@/components/ui/BulkActionsBar";
 
 const ICON_KEYS = ["paw", "face", "pulse", "family", "cloud-rain", "tree", "book", "ball", "burger", "globe"];
 
@@ -16,9 +23,10 @@ function draftFrom(c: Category): DraftFields {
 }
 
 export function CategoriesList() {
+  const toast = useToast();
+  const { confirm, dialog } = useConfirmDialog();
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [drafts, setDrafts] = useState<Record<string, DraftFields>>({});
   const [newLabel, setNewLabel] = useState("");
@@ -33,51 +41,68 @@ export function CategoriesList() {
         setCategories(cats);
         setDrafts(Object.fromEntries(cats.map((c) => [c.id, draftFrom(c)])));
       })
-      .catch(() => setError("Không tải được danh sách chủ đề."))
+      .catch(() => toast.error("Không tải được danh sách chủ đề."))
       .finally(() => setLoading(false));
   };
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(load, []);
 
   const handleCreate = async (e: FormEvent) => {
     e.preventDefault();
-    setError(null);
     try {
       await api.createCategory({ label: newLabel.trim(), icon: newIcon, color: newColor });
       setNewLabel("");
+      toast.success("Đã tạo chủ đề.");
       load();
     } catch (err) {
-      setError(err instanceof ApiError && err.code === "slug_taken" ? "Tên chủ đề đã tồn tại." : "Tạo chủ đề thất bại.");
+      toast.error(err instanceof ApiError && err.code === "slug_taken" ? "Tên chủ đề đã tồn tại." : "Tạo chủ đề thất bại.");
     }
   };
 
   const handleSave = async (id: string) => {
     const draft = drafts[id];
     if (!draft) return;
-    setError(null);
     try {
       await api.updateCategory(id, draft);
       setEditingId(null);
+      toast.success("Đã lưu chủ đề.");
       load();
     } catch {
-      setError("Cập nhật thất bại.");
+      toast.error("Cập nhật thất bại.");
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Xoá chủ đề này?")) return;
-    setError(null);
+    if (!(await confirm("Xoá chủ đề này?"))) return;
     try {
       await api.deleteCategory(id);
+      toast.success("Đã xoá chủ đề.");
       load();
     } catch (err) {
-      setError(err instanceof ApiError && err.code === "category_in_use" ? "Chủ đề đang có bài học, không thể xoá." : "Xoá thất bại.");
+      toast.error(err instanceof ApiError && err.code === "category_in_use" ? "Chủ đề đang có bài học, không thể xoá." : "Xoá thất bại.");
     }
+  };
+
+  const selection = useSelection(categories.map((c) => c.id));
+  const [bulkBusy, setBulkBusy] = useState(false);
+
+  const handleBulkDelete = async () => {
+    const ids = Array.from(selection.selected);
+    if (!(await confirm(`Xoá ${ids.length} chủ đề đã chọn?`))) return;
+    setBulkBusy(true);
+    const results = await Promise.allSettled(ids.map((id) => api.deleteCategory(id)));
+    const failed = results.filter((r) => r.status === "rejected").length;
+    selection.clear();
+    setBulkBusy(false);
+    load();
+    if (failed > 0) toast.error(`Xoá thất bại ${failed}/${ids.length} chủ đề (có thể đang có bài học).`);
+    else toast.success(`Đã xoá ${ids.length} chủ đề.`);
   };
 
   return (
     <div>
-      <h1 className="mb-6 text-2xl font-bold text-slate-800">Chủ đề</h1>
+      <PageHeader title="Chủ đề" />
 
       <form onSubmit={handleCreate} className="mb-6 flex flex-wrap items-end gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
         <label className="text-sm">
@@ -103,20 +128,26 @@ export function CategoriesList() {
           <span className="mb-1 block font-medium text-slate-600">Màu</span>
           <input type="color" value={newColor} onChange={(e) => setNewColor(e.target.value)} className="h-10 w-14 rounded-lg border border-slate-300" />
         </label>
-        <button type="submit" className="rounded-lg bg-sky-600 px-4 py-2 font-semibold text-white hover:bg-sky-700">
-          Thêm chủ đề
-        </button>
+        <Button type="submit">Thêm chủ đề</Button>
       </form>
 
-      {error && <p className="mb-4 text-sm text-red-600">{error}</p>}
-
       {loading ? (
-        <p className="text-slate-500">Đang tải...</p>
+        <Spinner />
       ) : (
+        <>
+          <BulkActionsBar count={selection.selected.size} onClear={selection.clear}>
+            <BulkActionButton variant="danger" onClick={handleBulkDelete} disabled={bulkBusy}>
+              Xoá đã chọn
+            </BulkActionButton>
+          </BulkActionsBar>
+
         <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
           <table className="w-full text-left text-sm">
             <thead className="bg-slate-50 text-slate-500">
               <tr>
+                <th className="w-10 px-4 py-3">
+                  <HeaderCheckbox checked={selection.allSelected} onChange={selection.toggleAll} />
+                </th>
                 <th className="px-4 py-3">Tên</th>
                 <th className="px-4 py-3">Slug</th>
                 <th className="px-4 py-3">Icon</th>
@@ -132,6 +163,9 @@ export function CategoriesList() {
                 const draft = drafts[c.id] ?? draftFrom(c);
                 return (
                   <tr key={c.id} className="border-t border-slate-100">
+                    <td className="px-4 py-2">
+                      <RowCheckbox checked={selection.selected.has(c.id)} onChange={() => selection.toggle(c.id)} />
+                    </td>
                     <td className="px-4 py-2">
                       {editing ? (
                         <input
@@ -222,7 +256,9 @@ export function CategoriesList() {
             </tbody>
           </table>
         </div>
+        </>
       )}
+      {dialog}
     </div>
   );
 }

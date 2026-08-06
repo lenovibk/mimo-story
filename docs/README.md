@@ -4,6 +4,7 @@
 |---|---|
 | [speech-recording.md](speech-recording.md) | Luồng ghi âm/nhận diện giọng nói/chấm điểm phát âm (Practice Speaking) — kiến trúc, các bug đã gặp/đã sửa, giới hạn còn tồn tại. |
 | [story-pipeline.md](story-pipeline.md) | Quy trình biến video trong `example/stories/` thành truyện trong app — dùng khi có video mới. |
+| [jenkins-deploy.md](jenkins-deploy.md) | Deploy bằng Jenkins (`../Jenkinsfile`) + hướng dẫn nối webhook GitHub ↔ Jenkins để tự động build/deploy khi push code. |
 | [design.md](design.md) | PRD/thiết kế tổng thể của app (bản gốc: `design/design.md`). |
 | [spec-accounts-personalization.md](spec-accounts-personalization.md) | Đề xuất spec tài khoản phụ huynh/cá nhân hóa (auth, wizard, dashboard, admin panel...) — **trái với triết lý "no login" của PRD gốc**, chưa cài đặt. |
 | [app-readme.md](app-readme.md) | README mặc định của template Vite (bản gốc: `app/README.md`). |

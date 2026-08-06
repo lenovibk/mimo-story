@@ -1,5 +1,8 @@
 import { useEffect, useState } from "react";
+import { BookOpen, Megaphone, Tag, Users } from "@phosphor-icons/react";
 import { api } from "@/services/api";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { StatCard } from "@/components/ui/StatCard";
 
 interface Stats {
   storyCount: number;
@@ -15,23 +18,14 @@ export function Dashboard() {
     api.getDashboard().then(setStats).catch(() => {});
   }, []);
 
-  const cards: { label: string; value: number | undefined }[] = [
-    { label: "Bài học", value: stats?.storyCount },
-    { label: "Chủ đề", value: stats?.categoryCount },
-    { label: "Người dùng", value: stats?.userCount },
-    { label: "Quảng cáo đang chạy", value: stats?.activeAdCount },
-  ];
-
   return (
     <div>
-      <h1 className="mb-6 text-2xl font-bold text-slate-800">Tổng quan</h1>
+      <PageHeader title="Tổng quan" />
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        {cards.map((c) => (
-          <div key={c.label} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <p className="text-sm text-slate-500">{c.label}</p>
-            <p className="mt-1 text-3xl font-bold text-slate-800">{c.value ?? "…"}</p>
-          </div>
-        ))}
+        <StatCard label="Bài học" value={stats?.storyCount} icon={BookOpen} tone="sky" />
+        <StatCard label="Chủ đề" value={stats?.categoryCount} icon={Tag} tone="pink" />
+        <StatCard label="Người dùng" value={stats?.userCount} icon={Users} tone="green" />
+        <StatCard label="Quảng cáo đang chạy" value={stats?.activeAdCount} icon={Megaphone} tone="amber" />
       </div>
     </div>
   );

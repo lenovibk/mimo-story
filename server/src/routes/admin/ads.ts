@@ -2,7 +2,9 @@ import { randomUUID } from "node:crypto";
 import { Router } from "express";
 import { prisma } from "../../prisma.js";
 import { asyncHandler } from "../../middleware/asyncHandler.js";
-import { fileExt, saveUploadedFile, uploadAdImage } from "../../services/upload.js";
+import { enqueueAdImageConversion } from "../../services/assetConversions.js";
+import { imageToWebp } from "../../services/media.js";
+import { saveUploadedFile, uploadAdImage } from "../../services/upload.js";
 
 const router = Router();
 
@@ -47,7 +49,7 @@ router.post(
     }
 
     const id = randomUUID();
-    const imageUrl = await saveUploadedFile(image.buffer, `ads/${id}/image${fileExt(image) || ".jpg"}`);
+    const imageUrl = await saveUploadedFile(await imageToWebp(image.buffer), `ads/${id}/image.webp`);
 
     const ad = await prisma.ad.create({
       data: {
@@ -80,7 +82,7 @@ router.patch(
     }
 
     const image = req.file;
-    const imageUrl = image ? await saveUploadedFile(image.buffer, `ads/${existing.id}/image${fileExt(image) || ".jpg"}`) : undefined;
+    const imageUrl = image ? await saveUploadedFile(await imageToWebp(image.buffer), `ads/${existing.id}/image.webp`) : undefined;
 
     const { title, linkUrl, placement, active } = req.body ?? {};
 
@@ -101,6 +103,20 @@ router.patch(
     });
 
     res.json(ad);
+  })
+);
+
+/** Manual "Convert" action (Ads List) - re-encodes the ad's currently saved image, regardless of its current format. */
+router.post(
+  "/:id/convert",
+  asyncHandler(async (req, res) => {
+    const ad = await prisma.ad.findUnique({ where: { id: req.params.id } });
+    if (!ad) {
+      res.status(404).json({ error: "not_found" });
+      return;
+    }
+    const jobId = await enqueueAdImageConversion(ad.id, ad.title, ad.imageUrl);
+    res.status(202).json({ jobId });
   })
 );
 

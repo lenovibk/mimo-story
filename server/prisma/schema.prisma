@@ -159,6 +159,9 @@ model Story {
   episodeLabel  String?
   coverUrl      String
   videoUrl      String?
+  /// "UPLOAD" | "YOUTUBE"
+  videoSourceType String @default("UPLOAD")
+  youtubeId     String?
   subtitleEnUrl String?
   subtitleViUrl String?
   audioUrl      String?
@@ -177,6 +180,7 @@ model Story {
 
   tags     StoryTagLink[]
   programs StoryProgramLink[]
+  conversionJobs ConversionJob[]
 
   @@index([categoryId])
 }
@@ -214,5 +218,32 @@ model Ad {
   endAt     DateTime?
   priority  Int       @default(0)
   createdAt DateTime  @default(now())
+}
+
+/// Tracks one ffmpeg/sharp media-compression run (image->webp or video->webm) so the
+/// admin Media Monitor page can show live progress and keep history across server
+/// restarts. storyId is set when the job belongs to a story's video field (the only
+/// async path today - image conversion happens inline, see services/media.ts).
+model ConversionJob {
+  id          String    @id @default(uuid())
+  /// "IMAGE" | "VIDEO"
+  kind        String
+  /// "QUEUED" | "PROCESSING" | "DONE" | "FAILED"
+  status      String    @default("QUEUED")
+  sourceName  String
+  sourceBytes Int
+  outputBytes Int?
+  outputUrl   String?
+  /// 0-1, only meaningful while status is PROCESSING
+  progress    Float     @default(0)
+  error       String?
+  storyId     String?
+  story       Story?    @relation(fields: [storyId], references: [id], onDelete: SetNull)
+  createdAt   DateTime  @default(now())
+  startedAt   DateTime?
+  finishedAt  DateTime?
+
+  @@index([storyId])
+  @@index([status])
 }
 

@@ -1,8 +1,21 @@
+import fs from "node:fs/promises";
+import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { Router } from "express";
 import { prisma } from "../../prisma.js";
 import { asyncHandler } from "../../middleware/asyncHandler.js";
-import { fileExt, resolveAssetUrl, saveUploadedFile, uploadStoryFiles } from "../../services/upload.js";
+import { enqueueStoryCoverConversion, enqueueStoryVideoReconversion } from "../../services/assetConversions.js";
+import { enqueueConversion } from "../../services/conversionQueue.js";
+import { imageToWebp, videoToWebm, writeTempFile } from "../../services/media.js";
+import {
+  extractYoutubeId,
+  fileExt,
+  resolveAssetUrl,
+  resolveUploadTarget,
+  saveUploadedFile,
+  uploadDir,
+  uploadStoryFiles,
+} from "../../services/upload.js";
 
 const router = Router();
 
@@ -12,6 +25,8 @@ function serializeStory(story: {
   episodeLabel: string | null;
   coverUrl: string;
   videoUrl: string | null;
+  videoSourceType: string;
+  youtubeId: string | null;
   subtitleEnUrl: string | null;
   subtitleViUrl: string | null;
   audioUrl: string | null;
@@ -27,13 +42,15 @@ function serializeStory(story: {
   updatedAt: Date;
   tags: { tag: string }[];
   programs: { program: { id: string; slug: string; label: string } }[];
-}) {
+}, convertingIds: Set<string> = new Set()) {
   return {
     id: story.id,
     title: story.title,
     episodeLabel: story.episodeLabel,
     coverUrl: resolveAssetUrl(story.coverUrl),
     videoUrl: story.videoUrl ? resolveAssetUrl(story.videoUrl) : null,
+    videoSourceType: story.videoSourceType,
+    youtubeId: story.youtubeId,
     subtitleEnUrl: story.subtitleEnUrl ? resolveAssetUrl(story.subtitleEnUrl) : null,
     subtitleViUrl: story.subtitleViUrl ? resolveAssetUrl(story.subtitleViUrl) : null,
     audioUrl: story.audioUrl ? resolveAssetUrl(story.audioUrl) : null,
@@ -51,6 +68,8 @@ function serializeStory(story: {
     createdAt: story.createdAt,
     updatedAt: story.updatedAt,
     tags: story.tags.map((t) => t.tag),
+    /** True while a background ConversionJob is still re-encoding this story's video - see Stories List/Form badges. */
+    videoConverting: convertingIds.has(story.id),
   };
 }
 
@@ -65,6 +84,39 @@ function parseNullableInt(input: unknown): number | null | undefined {
   if (input === "" || input === null) return null;
   const n = Number(input);
   return Number.isFinite(n) ? Math.trunc(n) : null;
+}
+
+/**
+ * Video transcoding takes real time, so it never blocks the story save response. The
+ * raw upload is saved immediately (under `video<ext>`) so the story is watchable right
+ * away, and a ConversionJob is enqueued to re-encode it to `video.webm` in the
+ * background; Story.videoUrl flips over to the compressed file once that finishes and
+ * the raw original is deleted. The admin UI shows a "converting" badge (Stories
+ * List/Form) by polling this job's status.
+ */
+async function enqueueStoryVideoConversion(storyId: string, video: Express.Multer.File, rawSubpath: string): Promise<string> {
+  const tempInput = await writeTempFile(video.buffer, fileExt(video) || ".mp4");
+  const webmSubpath = `stories/${storyId}/video.webm`;
+  return enqueueConversion({
+    kind: "VIDEO",
+    sourceName: video.originalname,
+    sourceBytes: video.buffer.length,
+    storyId,
+    process: async (onProgress) => {
+      const target = await resolveUploadTarget(webmSubpath);
+      try {
+        await videoToWebm(tempInput, target.path, onProgress);
+      } finally {
+        await fs.unlink(tempInput).catch(() => {});
+      }
+      const { size } = await fs.stat(target.path);
+      await prisma.story.update({ where: { id: storyId }, data: { videoUrl: target.url } });
+      if (rawSubpath !== webmSubpath) {
+        await fs.unlink(path.join(uploadDir, rawSubpath)).catch(() => {});
+      }
+      return { outputUrl: target.url, outputBytes: size };
+    },
+  });
 }
 
 function parseIds(input: unknown): string[] {
@@ -89,7 +141,7 @@ router.get(
       ...(typeof search === "string" && search ? { title: { contains: search } } : {}),
     };
 
-    const [stories, total] = await Promise.all([
+    const [stories, total, activeJobs] = await Promise.all([
       prisma.story.findMany({
         where,
         include,
@@ -98,9 +150,14 @@ router.get(
         skip,
       }),
       prisma.story.count({ where }),
+      prisma.conversionJob.findMany({
+        where: { kind: "VIDEO", status: { in: ["QUEUED", "PROCESSING"] }, storyId: { not: null } },
+        select: { storyId: true },
+      }),
     ]);
 
-    res.json({ stories: stories.map(serializeStory), total });
+    const convertingIds = new Set(activeJobs.map((j) => j.storyId!));
+    res.json({ stories: stories.map((s) => serializeStory(s, convertingIds)), total });
   })
 );
 
@@ -118,6 +175,10 @@ router.post(
     const { title, episodeLabel, categoryId, accent } = req.body ?? {};
     const mediaType = req.body?.mediaType === "AUDIO" ? "AUDIO" : "VIDEO";
     const programIds = parseIds(req.body?.programIds);
+    const videoSourceType = req.body?.videoSourceType === "YOUTUBE" ? "YOUTUBE" : "UPLOAD";
+    const youtubeId = videoSourceType === "YOUTUBE" && typeof req.body?.youtubeUrl === "string"
+      ? extractYoutubeId(req.body.youtubeUrl)
+      : null;
 
     if (
       typeof title !== "string" ||
@@ -133,13 +194,26 @@ router.post(
       res.status(400).json({ error: "missing_files" });
       return;
     }
-    if (mediaType === "VIDEO" && (!video || !subtitleEn || !subtitleVi)) {
-      res.status(400).json({ error: "missing_files" });
+    const published = req.body?.published === "false" ? false : true;
+    if (mediaType === "VIDEO" && videoSourceType === "YOUTUBE" && !youtubeId) {
+      res.status(400).json({ error: "invalid_youtube_url" });
       return;
     }
-    if (mediaType === "AUDIO" && !audio) {
-      res.status(400).json({ error: "missing_files" });
-      return;
+    // A hidden draft can be created metadata-first with no video/subtitles yet -
+    // only enforce completeness when the story would actually be visible in the app.
+    if (published) {
+      if (mediaType === "VIDEO" && videoSourceType === "UPLOAD" && (!video || !subtitleEn || !subtitleVi)) {
+        res.status(400).json({ error: "missing_files" });
+        return;
+      }
+      if (mediaType === "VIDEO" && videoSourceType === "YOUTUBE" && (!subtitleEn || !subtitleVi)) {
+        res.status(400).json({ error: "missing_files" });
+        return;
+      }
+      if (mediaType === "AUDIO" && !audio) {
+        res.status(400).json({ error: "missing_files" });
+        return;
+      }
     }
 
     const [category, programCount] = await Promise.all([
@@ -156,9 +230,11 @@ router.post(
     }
 
     const id = randomUUID();
+    const useUploadedVideo = video && videoSourceType === "UPLOAD";
+    const rawVideoSubpath = useUploadedVideo ? `stories/${id}/video${fileExt(video) || ".mp4"}` : null;
     const [coverUrl, videoUrl, subtitleEnUrl, subtitleViUrl, audioUrl] = await Promise.all([
-      saveUploadedFile(cover.buffer, `stories/${id}/cover${fileExt(cover) || ".webp"}`),
-      video ? saveUploadedFile(video.buffer, `stories/${id}/video${fileExt(video) || ".webm"}`) : Promise.resolve(null),
+      saveUploadedFile(await imageToWebp(cover.buffer), `stories/${id}/cover.webp`),
+      useUploadedVideo && rawVideoSubpath ? saveUploadedFile(video!.buffer, rawVideoSubpath) : Promise.resolve(null),
       subtitleEn
         ? saveUploadedFile(subtitleEn.buffer, `stories/${id}/subtitle_en${fileExt(subtitleEn) || ".srt"}`)
         : Promise.resolve(null),
@@ -175,6 +251,8 @@ router.post(
         episodeLabel: typeof episodeLabel === "string" && episodeLabel.trim() ? episodeLabel.trim() : null,
         coverUrl,
         videoUrl,
+        videoSourceType,
+        youtubeId,
         subtitleEnUrl,
         subtitleViUrl,
         audioUrl,
@@ -183,13 +261,19 @@ router.post(
         accent: typeof accent === "string" && accent ? accent : null,
         minAge: parseNullableInt(req.body?.minAge) ?? null,
         maxAge: parseNullableInt(req.body?.maxAge) ?? null,
-        published: req.body?.published === "false" ? false : true,
+        published,
         categoryId,
         tags: { create: parseTags(req.body?.tags).map((tag) => ({ tag })) },
         programs: { create: programIds.map((programId) => ({ programId })) },
       },
       include,
     });
+
+    if (useUploadedVideo && rawVideoSubpath) {
+      const jobId = await enqueueStoryVideoConversion(id, video!, rawVideoSubpath);
+      res.status(201).json({ ...serializeStory(story), videoConverting: true, pendingVideoJobId: jobId });
+      return;
+    }
 
     res.status(201).json(serializeStory(story));
   })
@@ -213,9 +297,45 @@ router.patch(
     const audio = files?.audio?.[0];
     const id = existing.id;
 
-    const [coverUrl, videoUrl, subtitleEnUrl, subtitleViUrl, audioUrl] = await Promise.all([
-      cover ? saveUploadedFile(cover.buffer, `stories/${id}/cover${fileExt(cover) || ".webp"}`) : Promise.resolve(undefined),
-      video ? saveUploadedFile(video.buffer, `stories/${id}/video${fileExt(video) || ".webm"}`) : Promise.resolve(undefined),
+    const { title, episodeLabel, categoryId, mediaType, accent, published, tags } = req.body ?? {};
+    const programIds = parseIds(req.body?.programIds);
+    const effectiveMediaType = mediaType === "AUDIO" || mediaType === "VIDEO" ? mediaType : existing.mediaType;
+    const videoSourceType =
+      req.body?.videoSourceType === "YOUTUBE"
+        ? "YOUTUBE"
+        : req.body?.videoSourceType === "UPLOAD"
+          ? "UPLOAD"
+          : existing.videoSourceType;
+
+    let youtubeId: string | null = null;
+    if (videoSourceType === "YOUTUBE") {
+      const rawUrl = typeof req.body?.youtubeUrl === "string" ? req.body.youtubeUrl.trim() : "";
+      youtubeId = rawUrl ? extractYoutubeId(rawUrl) : existing.youtubeId;
+      if (!youtubeId) {
+        res.status(400).json({ error: "invalid_youtube_url" });
+        return;
+      }
+    }
+    const useUploadedVideo = video && videoSourceType === "UPLOAD";
+    const effectivePublished = published !== undefined ? published !== "false" : existing.published;
+    // Only enforce "must have a video" when the save would make the story visible in the
+    // app - a hidden draft can be saved metadata-first and have its video added later.
+    if (
+      effectivePublished &&
+      effectiveMediaType === "VIDEO" &&
+      videoSourceType === "UPLOAD" &&
+      !useUploadedVideo &&
+      !(existing.videoSourceType === "UPLOAD" && existing.videoUrl)
+    ) {
+      res.status(400).json({ error: "missing_files" });
+      return;
+    }
+
+    const rawVideoSubpath = useUploadedVideo ? `stories/${id}/video${fileExt(video) || ".mp4"}` : null;
+
+    const [coverUrl, uploadedVideoUrl, subtitleEnUrl, subtitleViUrl, audioUrl] = await Promise.all([
+      cover ? saveUploadedFile(await imageToWebp(cover.buffer), `stories/${id}/cover.webp`) : Promise.resolve(undefined),
+      useUploadedVideo && rawVideoSubpath ? saveUploadedFile(video!.buffer, rawVideoSubpath) : Promise.resolve(undefined),
       subtitleEn
         ? saveUploadedFile(subtitleEn.buffer, `stories/${id}/subtitle_en${fileExt(subtitleEn) || ".srt"}`)
         : Promise.resolve(undefined),
@@ -224,9 +344,6 @@ router.patch(
         : Promise.resolve(undefined),
       audio ? saveUploadedFile(audio.buffer, `stories/${id}/audio${fileExt(audio) || ".mp3"}`) : Promise.resolve(undefined),
     ]);
-
-    const { title, episodeLabel, categoryId, mediaType, accent, published, tags } = req.body ?? {};
-    const programIds = parseIds(req.body?.programIds);
 
     if (typeof categoryId === "string" && categoryId) {
       const category = await prisma.category.findUnique({ where: { id: categoryId } });
@@ -249,7 +366,9 @@ router.patch(
         ...(typeof title === "string" && title.trim() ? { title: title.trim() } : {}),
         ...(episodeLabel !== undefined ? { episodeLabel: episodeLabel?.trim() || null } : {}),
         ...(coverUrl ? { coverUrl } : {}),
-        ...(videoUrl ? { videoUrl } : {}),
+        videoSourceType,
+        youtubeId: videoSourceType === "YOUTUBE" ? youtubeId : null,
+        videoUrl: videoSourceType === "YOUTUBE" ? null : (uploadedVideoUrl ?? undefined),
         ...(subtitleEnUrl ? { subtitleEnUrl } : {}),
         ...(subtitleViUrl ? { subtitleViUrl } : {}),
         ...(audioUrl ? { audioUrl } : {}),
@@ -268,7 +387,32 @@ router.patch(
       include,
     });
 
+    if (useUploadedVideo && rawVideoSubpath) {
+      const jobId = await enqueueStoryVideoConversion(id, video!, rawVideoSubpath);
+      res.json({ ...serializeStory(story), videoConverting: true, pendingVideoJobId: jobId });
+      return;
+    }
+
     res.json(serializeStory(story));
+  })
+);
+
+/** Manual "Convert" action (Stories List/Form) - re-encodes the story's *currently saved* cover/video, regardless of their current format. Unlike the upload flow this re-downloads the existing asset instead of using a fresh multer buffer. */
+router.post(
+  "/:id/convert",
+  asyncHandler(async (req, res) => {
+    const story = await prisma.story.findUnique({ where: { id: req.params.id } });
+    if (!story) {
+      res.status(404).json({ error: "not_found" });
+      return;
+    }
+
+    const [coverJobId, videoJobId] = await Promise.all([
+      enqueueStoryCoverConversion(story.id, story.title, story.coverUrl),
+      story.videoUrl ? enqueueStoryVideoReconversion(story.id, story.title, story.videoUrl) : Promise.resolve(null),
+    ]);
+
+    res.status(202).json({ coverJobId, videoJobId });
   })
 );
 

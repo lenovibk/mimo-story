@@ -13,6 +13,7 @@ import { StoryEndDialog } from "@/components/StoryEndDialog/StoryEndDialog";
 import { Subtitle } from "@/components/Subtitle/Subtitle";
 import { useEnsureCatalogLoaded } from "@/hooks/useEnsureCatalogLoaded";
 import { findActiveCue, findNearestCue, useSubtitles } from "@/hooks/useSubtitles";
+import { useYouTubePlayer } from "@/hooks/useYouTubePlayer";
 import { api } from "@/services/api";
 import { getAudioRecorder } from "@/services/Recording";
 import {
@@ -61,8 +62,10 @@ export function Player() {
   const catalogLoaded = useCatalogStore((s) => s.loaded);
   const story = id ? stories.find((s) => s.id === id) : undefined;
   const { en, vi, loading } = useSubtitles(story);
+  const isYoutube = story?.videoSourceType === "YOUTUBE";
 
   const videoRef = useRef<HTMLVideoElement>(null);
+  const youtubeContainerRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const listenTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const audioUrlRef = useRef<string | null>(null);
@@ -159,6 +162,59 @@ export function Player() {
     }
   };
 
+  const applyTimeUpdate = (time: number, duration: number) => {
+    setCurrentTime(time);
+
+    // Persist "continue learning" progress, throttled - this fires many times a second.
+    const now = Date.now();
+    if (story && duration > 0 && now - lastProgressSaveRef.current > 3000) {
+      const deltaSeconds = lastProgressSaveRef.current > 0 ? (now - lastProgressSaveRef.current) / 1000 : 0;
+      lastProgressSaveRef.current = now;
+      const ratio = time / duration;
+      setStoryProgress(activeChildId, story.id, ratio);
+      void api.putProgress(activeChildId, story.id, ratio, deltaSeconds).catch(() => {});
+    }
+  };
+
+  const handleVideoEnded = () => {
+    if (story) {
+      setStoryProgress(activeChildId, story.id, 1);
+      void api.putProgress(activeChildId, story.id, 1).catch(() => {});
+    }
+    if (autoPlayNext) {
+      if (nextStory) navigate(`/story/${nextStory.id}`, { replace: true });
+      else navigate("/home");
+      return;
+    }
+    if (nextStory) setShowEndDialog(true);
+    else navigate("/home");
+  };
+
+  // Hook order can't depend on `story` being loaded yet - always called, no-ops until a YouTube
+  // story's youtubeId is available. Keeps play/pause/seek/currentTime uniform with native <video>
+  // for the rest of the component (progress bar, subtitle sync, practice-speaking pause).
+  const { controller: ytController } = useYouTubePlayer(youtubeContainerRef, isYoutube ? story?.youtubeId : undefined, {
+    onTimeUpdate: (seconds) => applyTimeUpdate(seconds, videoDuration),
+    onLoadedMetadata: setVideoDuration,
+    onEnded: handleVideoEnded,
+  });
+
+  const playMedia = () => {
+    if (isYoutube) ytController?.play();
+    else void videoRef.current?.play();
+  };
+  const pauseMedia = () => {
+    if (isYoutube) ytController?.pause();
+    else videoRef.current?.pause();
+  };
+  const seekMedia = (time: number) => {
+    if (isYoutube) ytController?.seekTo(time);
+    else if (videoRef.current) videoRef.current.currentTime = time;
+  };
+  // Read fresh at call time (not captured per-render) - videoRef.current is a mutable ref that
+  // can populate without triggering a re-render, so a render-time snapshot could go stale.
+  const isMediaReady = () => (isYoutube ? Boolean(ytController) : Boolean(videoRef.current));
+
   if (!story) {
     // Catalog is still loading (async fetch) - not actually "not found" yet.
     if (!catalogLoaded) return <div className="h-full w-full bg-black" />;
@@ -179,17 +235,7 @@ export function Player() {
   const handleTimeUpdate = () => {
     const video = videoRef.current;
     if (!video) return;
-    setCurrentTime(video.currentTime);
-
-    // Persist "continue learning" progress, throttled - this fires many times a second.
-    const now = Date.now();
-    if (story && video.duration > 0 && now - lastProgressSaveRef.current > 3000) {
-      const deltaSeconds = lastProgressSaveRef.current > 0 ? (now - lastProgressSaveRef.current) / 1000 : 0;
-      lastProgressSaveRef.current = now;
-      const ratio = video.currentTime / video.duration;
-      setStoryProgress(activeChildId, story.id, ratio);
-      void api.putProgress(activeChildId, story.id, ratio, deltaSeconds).catch(() => {});
-    }
+    applyTimeUpdate(video.currentTime, video.duration);
   };
 
   const handleLoadedMetadata = () => {
@@ -197,50 +243,45 @@ export function Player() {
   };
 
   const handleTogglePause = () => {
-    const video = videoRef.current;
-    if (!video || phase !== "idle") return;
-    if (video.paused) {
-      void video.play();
+    if (!isMediaReady() || phase !== "idle") return;
+    if (isPaused) {
+      playMedia();
       setIsPaused(false);
     } else {
-      video.pause();
+      pauseMedia();
       setIsPaused(true);
     }
   };
 
   const handleSeek = (time: number) => {
-    const video = videoRef.current;
-    if (!video || phase !== "idle") return;
-    video.currentTime = time;
+    if (!isMediaReady() || phase !== "idle") return;
+    seekMedia(time);
     setCurrentTime(time);
   };
 
   const handleScrubStart = () => {
-    const video = videoRef.current;
-    if (!video || phase !== "idle") return;
-    wasPlayingBeforeScrubRef.current = !video.paused;
-    video.pause();
+    if (!isMediaReady() || phase !== "idle") return;
+    wasPlayingBeforeScrubRef.current = !isPaused;
+    pauseMedia();
     setIsPaused(true);
   };
 
   const handleScrubEnd = () => {
-    const video = videoRef.current;
-    if (!video || phase !== "idle") return;
+    if (!isMediaReady() || phase !== "idle") return;
     if (wasPlayingBeforeScrubRef.current) {
-      void video.play();
+      playMedia();
       setIsPaused(false);
     }
   };
 
   const startPractice = () => {
-    const video = videoRef.current;
-    if (!video || phase !== "idle") return;
+    if (!isMediaReady() || phase !== "idle") return;
 
     const target = currentEnCue ?? findNearestCue(en, currentTime);
     if (!target) return;
 
     primeAudio();
-    video.pause();
+    pauseMedia();
     setIsPaused(true);
     setPracticeTarget(target.text);
     setPhase("countdown");
@@ -303,27 +344,13 @@ export function Player() {
     setPhase("idle");
     setResult(null);
     setIsPaused(false);
-    void videoRef.current?.play();
+    playMedia();
   };
 
   const handleRetry = () => {
     primeAudio();
     setResult(null);
     setPhase("countdown");
-  };
-
-  const handleVideoEnded = () => {
-    if (story) {
-      setStoryProgress(activeChildId, story.id, 1);
-      void api.putProgress(activeChildId, story.id, 1).catch(() => {});
-    }
-    if (autoPlayNext) {
-      if (nextStory) navigate(`/story/${nextStory.id}`, { replace: true });
-      else navigate("/home");
-      return;
-    }
-    if (nextStory) setShowEndDialog(true);
-    else navigate("/home");
   };
 
   const handleContinueNext = () => {
@@ -337,19 +364,32 @@ export function Player() {
       className="relative h-full w-full touch-none overflow-hidden bg-black"
       onClick={handleScreenTap}
     >
-      <video
-        key={story.id}
-        ref={videoRef}
-        src={story.video}
-        autoPlay
-        playsInline
-        disablePictureInPicture
-        onTimeUpdate={handleTimeUpdate}
-        onLoadedMetadata={handleLoadedMetadata}
-        onContextMenu={(e) => e.preventDefault()}
-        onEnded={handleVideoEnded}
-        className="h-full w-full object-contain"
-      />
+      {isYoutube ? (
+        <div
+          key={story.id}
+          className="relative h-full w-full [&>iframe]:absolute [&>iframe]:inset-0 [&>iframe]:h-full [&>iframe]:w-full"
+        >
+          <div ref={youtubeContainerRef} className="h-full w-full" />
+          {/* The iframe is cross-origin, so clicks inside it never bubble to our onClick handlers -
+              this transparent layer catches taps (show/hide controls) instead of letting them fall
+              through to YouTube's own hidden UI. */}
+          <div className="absolute inset-0" onContextMenu={(e) => e.preventDefault()} />
+        </div>
+      ) : (
+        <video
+          key={story.id}
+          ref={videoRef}
+          src={story.video}
+          autoPlay
+          playsInline
+          disablePictureInPicture
+          onTimeUpdate={handleTimeUpdate}
+          onLoadedMetadata={handleLoadedMetadata}
+          onContextMenu={(e) => e.preventDefault()}
+          onEnded={handleVideoEnded}
+          className="h-full w-full object-contain"
+        />
+      )}
 
       <div
         className={`absolute inset-x-0 top-0 z-20 flex flex-col gap-2 transition-opacity duration-300 ${

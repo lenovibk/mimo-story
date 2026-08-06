@@ -1,6 +1,14 @@
 import { Fragment, useEffect, useState, type FormEvent } from "react";
 import { api, ApiError } from "@/services/api";
 import type { Category, Program } from "@/types";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Button } from "@/components/ui/Button";
+import { Badge } from "@/components/ui/Badge";
+import { Spinner } from "@/components/ui/Spinner";
+import { useConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { useToast } from "@/components/ui/Toast";
+import { useSelection } from "@/hooks/useSelection";
+import { BulkActionsBar, BulkActionButton, HeaderCheckbox, RowCheckbox } from "@/components/ui/BulkActionsBar";
 
 const ICON_KEYS = ["book", "music", "chat", "headphones", "fox"];
 const AGES = [3, 4, 5, 6, 7] as const;
@@ -18,10 +26,11 @@ function draftFrom(p: Program): DraftFields {
 }
 
 export function ProgramsList() {
+  const toast = useToast();
+  const { confirm, dialog } = useConfirmDialog();
   const [programs, setPrograms] = useState<Program[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [configuringId, setConfiguringId] = useState<string | null>(null);
   const [drafts, setDrafts] = useState<Record<string, DraftFields>>({});
@@ -37,46 +46,74 @@ export function ProgramsList() {
         setCategories(cats);
         setDrafts(Object.fromEntries(progs.map((p) => [p.id, draftFrom(p)])));
       })
-      .catch(() => setError("Không tải được danh sách chương trình."))
+      .catch(() => toast.error("Không tải được danh sách chương trình."))
       .finally(() => setLoading(false));
   };
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(load, []);
 
   const handleCreate = async (e: FormEvent) => {
     e.preventDefault();
-    setError(null);
     try {
       await api.createProgram({ label: newLabel.trim(), icon: newIcon, color: newColor, published: false });
       setNewLabel("");
+      toast.success("Đã tạo chương trình.");
       load();
     } catch (err) {
-      setError(err instanceof ApiError && err.code === "slug_taken" ? "Tên chương trình đã tồn tại." : "Tạo chương trình thất bại.");
+      toast.error(err instanceof ApiError && err.code === "slug_taken" ? "Tên chương trình đã tồn tại." : "Tạo chương trình thất bại.");
     }
   };
 
   const handleSave = async (id: string) => {
     const draft = drafts[id];
     if (!draft) return;
-    setError(null);
     try {
       await api.updateProgram(id, draft);
       setEditingId(null);
+      toast.success("Đã lưu chương trình.");
       load();
     } catch {
-      setError("Cập nhật thất bại.");
+      toast.error("Cập nhật thất bại.");
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Xoá chương trình này?")) return;
-    setError(null);
+    if (!(await confirm("Xoá chương trình này?"))) return;
     try {
       await api.deleteProgram(id);
+      toast.success("Đã xoá chương trình.");
       load();
     } catch (err) {
-      setError(err instanceof ApiError && err.code === "program_in_use" ? "Chương trình đang có bài học, không thể xoá." : "Xoá thất bại.");
+      toast.error(err instanceof ApiError && err.code === "program_in_use" ? "Chương trình đang có bài học, không thể xoá." : "Xoá thất bại.");
     }
+  };
+
+  const selection = useSelection(programs.map((p) => p.id));
+  const [bulkBusy, setBulkBusy] = useState(false);
+
+  const handleBulkDelete = async () => {
+    const ids = Array.from(selection.selected);
+    if (!(await confirm(`Xoá ${ids.length} chương trình đã chọn?`))) return;
+    setBulkBusy(true);
+    const results = await Promise.allSettled(ids.map((id) => api.deleteProgram(id)));
+    const failed = results.filter((r) => r.status === "rejected").length;
+    selection.clear();
+    setBulkBusy(false);
+    load();
+    if (failed > 0) toast.error(`Xoá thất bại ${failed}/${ids.length} chương trình (có thể đang có bài học).`);
+    else toast.success(`Đã xoá ${ids.length} chương trình.`);
+  };
+
+  const handleBulkPublish = async (published: boolean) => {
+    const ids = Array.from(selection.selected);
+    setBulkBusy(true);
+    const results = await Promise.allSettled(ids.map((id) => api.updateProgram(id, { published })));
+    const failed = results.filter((r) => r.status === "rejected").length;
+    setBulkBusy(false);
+    load();
+    if (failed > 0) toast.error(`Cập nhật thất bại ${failed}/${ids.length} chương trình.`);
+    else toast.success(`Đã ${published ? "hiện" : "ẩn"} ${ids.length} chương trình.`);
   };
 
   const toggleAge = async (program: Program, age: number) => {
@@ -95,7 +132,7 @@ export function ProgramsList() {
 
   return (
     <div>
-      <h1 className="mb-6 text-2xl font-bold text-slate-800">Chương trình học</h1>
+      <PageHeader title="Chương trình học" />
 
       <form onSubmit={handleCreate} className="mb-6 flex flex-wrap items-end gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
         <label className="text-sm">
@@ -121,20 +158,32 @@ export function ProgramsList() {
           <span className="mb-1 block font-medium text-slate-600">Màu</span>
           <input type="color" value={newColor} onChange={(e) => setNewColor(e.target.value)} className="h-10 w-14 rounded-lg border border-slate-300" />
         </label>
-        <button type="submit" className="rounded-lg bg-sky-600 px-4 py-2 font-semibold text-white hover:bg-sky-700">
-          Thêm chương trình
-        </button>
+        <Button type="submit">Thêm chương trình</Button>
       </form>
 
-      {error && <p className="mb-4 text-sm text-red-600">{error}</p>}
-
       {loading ? (
-        <p className="text-slate-500">Đang tải...</p>
+        <Spinner />
       ) : (
+        <>
+          <BulkActionsBar count={selection.selected.size} onClear={selection.clear}>
+            <BulkActionButton onClick={() => handleBulkPublish(true)} disabled={bulkBusy}>
+              Hiện
+            </BulkActionButton>
+            <BulkActionButton onClick={() => handleBulkPublish(false)} disabled={bulkBusy}>
+              Ẩn
+            </BulkActionButton>
+            <BulkActionButton variant="danger" onClick={handleBulkDelete} disabled={bulkBusy}>
+              Xoá đã chọn
+            </BulkActionButton>
+          </BulkActionsBar>
+
         <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
           <table className="w-full text-left text-sm">
             <thead className="bg-slate-50 text-slate-500">
               <tr>
+                <th className="w-10 px-4 py-3">
+                  <HeaderCheckbox checked={selection.allSelected} onChange={selection.toggleAll} />
+                </th>
                 <th className="px-4 py-3">Tên</th>
                 <th className="px-4 py-3">Slug</th>
                 <th className="px-4 py-3">Icon</th>
@@ -153,6 +202,9 @@ export function ProgramsList() {
                 return (
                   <Fragment key={p.id}>
                     <tr className="border-t border-slate-100">
+                      <td className="px-4 py-2">
+                        <RowCheckbox checked={selection.selected.has(p.id)} onChange={() => selection.toggle(p.id)} />
+                      </td>
                       <td className="px-4 py-2">
                         {editing ? (
                           <input
@@ -226,9 +278,7 @@ export function ProgramsList() {
                             Hiển thị
                           </label>
                         ) : (
-                          <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${p.published ? "bg-green-100 text-green-700" : "bg-slate-100 text-slate-500"}`}>
-                            {p.published ? "Hiển thị" : "Ẩn"}
-                          </span>
+                          <Badge tone={p.published ? "success" : "neutral"}>{p.published ? "Hiển thị" : "Ẩn"}</Badge>
                         )}
                       </td>
                       <td className="px-4 py-2">{p.storyCount}</td>
@@ -263,7 +313,7 @@ export function ProgramsList() {
                     </tr>
                     {configuring && (
                       <tr className="border-t border-slate-100 bg-slate-50">
-                        <td colSpan={8} className="px-4 py-4">
+                        <td colSpan={9} className="px-4 py-4">
                           <div className="grid grid-cols-2 gap-6">
                             <div>
                               <p className="mb-2 text-xs font-semibold text-slate-500">Độ tuổi áp dụng</p>
@@ -301,7 +351,9 @@ export function ProgramsList() {
             </tbody>
           </table>
         </div>
+        </>
       )}
+      {dialog}
     </div>
   );
 }

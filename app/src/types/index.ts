@@ -46,6 +46,9 @@ export interface Story {
   cover: string;
   /** VP9/Opus WebM video. Not playable on iOS/Safari. Absent for audio-only content. */
   video?: string;
+  /** "UPLOAD" | "YOUTUBE" - when YOUTUBE, `video` is absent and `youtubeId` drives playback instead. */
+  videoSourceType: string;
+  youtubeId?: string;
   /** Runtime in seconds, shown on the story list and as the total in the player's progress readout. */
   duration?: number;
   subtitleEn?: string;

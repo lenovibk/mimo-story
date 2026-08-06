@@ -8,6 +8,7 @@ import categoriesRouter from "./categories.js";
 import programsRouter from "./programs.js";
 import usersRouter from "./users.js";
 import adsRouter from "./ads.js";
+import mediaJobsRouter from "./mediaJobs.js";
 
 const router = Router();
 
@@ -33,5 +34,6 @@ router.use("/categories", categoriesRouter);
 router.use("/programs", programsRouter);
 router.use("/users", usersRouter);
 router.use("/ads", adsRouter);
+router.use("/media-jobs", mediaJobsRouter);
 
 export default router;

@@ -23,6 +23,13 @@ const categories = [
   { slug: "activities", label: "Trò chơi & Hoạt động", icon: "ball", color: "#FFB25C", order: 7 },
   { slug: "food", label: "Ăn uống", icon: "burger", color: "#FFC7A0", order: 8 },
   { slug: "world", label: "Thế giới xung quanh", icon: "globe", color: "#6FE0C8", order: 9 },
+  // Little Fox program levels - modeled as categories so they reuse the existing
+  // Story.categoryId + ProgramCategoryLink plumbing without a schema change.
+  { slug: "little-fox-level-1", label: "Level 1", icon: "book", color: "#FFD1E5", order: 10 },
+  { slug: "little-fox-level-2", label: "Level 2", icon: "book", color: "#FFB3D1", order: 11 },
+  { slug: "little-fox-level-3", label: "Level 3", icon: "book", color: "#FF92C2", order: 12 },
+  { slug: "little-fox-level-4", label: "Level 4", icon: "book", color: "#FF6FAE", order: 13 },
+  { slug: "little-fox-level-5", label: "Level 5", icon: "book", color: "#FF4C99", order: 14 },
 ];
 
 const programs = [
@@ -85,7 +92,13 @@ const programs = [
     order: 4,
     published: false,
     ages: [4, 5, 6, 7],
-    categorySlugs: ["animals", "family", "world"],
+    categorySlugs: [
+      "little-fox-level-1",
+      "little-fox-level-2",
+      "little-fox-level-3",
+      "little-fox-level-4",
+      "little-fox-level-5",
+    ],
   },
 ];
 
@@ -222,7 +235,6 @@ async function main() {
       duration: s.duration,
       accent: s.accent,
       categoryId,
-      programId: truyenProgramId,
     };
 
     await prisma.story.upsert({
@@ -230,11 +242,13 @@ async function main() {
       update: {
         ...data,
         tags: { deleteMany: {}, create: (s.tags ?? []).map((tag) => ({ tag })) },
+        programs: { deleteMany: {}, create: [{ programId: truyenProgramId }] },
       },
       create: {
         id: s.id,
         ...data,
         tags: { create: (s.tags ?? []).map((tag) => ({ tag })) },
+        programs: { create: [{ programId: truyenProgramId }] },
       },
     });
   }

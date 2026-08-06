@@ -1,5 +1,5 @@
 import { useAdminAuthStore } from "@/store/useAdminAuthStore";
-import type { Ad, AdminUser, Category, Program, Story, UserDetail, UserListItem } from "@/types";
+import type { Ad, AdminUser, Category, ConversionJob, Program, Story, UserDetail, UserListItem } from "@/types";
 
 const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3002/api";
 
@@ -65,6 +65,8 @@ export const api = {
   createStory: (formData: FormData) => request<Story>("/admin/stories", { method: "POST", body: formData }),
   updateStory: (id: string, formData: FormData) => request<Story>(`/admin/stories/${id}`, { method: "PATCH", body: formData }),
   deleteStory: (id: string) => request<void>(`/admin/stories/${id}`, { method: "DELETE" }),
+  convertStoryMedia: (id: string) =>
+    request<{ coverJobId: string; videoJobId: string | null }>(`/admin/stories/${id}/convert`, { method: "POST" }),
 
   getSubtitle: (id: string, lang: "en" | "vi") => request<{ content: string }>(`/admin/stories/${id}/subtitle/${lang}`),
   saveSubtitle: (id: string, lang: "en" | "vi", content: string) =>
@@ -103,6 +105,13 @@ export const api = {
   createAd: (formData: FormData) => request<Ad>("/admin/ads", { method: "POST", body: formData }),
   updateAd: (id: string, formData: FormData) => request<Ad>(`/admin/ads/${id}`, { method: "PATCH", body: formData }),
   deleteAd: (id: string) => request<void>(`/admin/ads/${id}`, { method: "DELETE" }),
+  convertAdMedia: (id: string) => request<{ jobId: string }>(`/admin/ads/${id}/convert`, { method: "POST" }),
+
+  getMediaJobs: (params: { skip?: number; take?: number } = {}) =>
+    request<{ jobs: ConversionJob[]; total: number }>(`/admin/media-jobs${toQueryString(params)}`),
+  getMediaJob: (id: string) => request<ConversionJob>(`/admin/media-jobs/${id}`),
+  convertMedia: (formData: FormData) => request<{ jobId: string }>("/admin/media-jobs/convert", { method: "POST", body: formData }),
+  backfillMediaJobs: () => request<{ enqueued: number }>("/admin/media-jobs/backfill", { method: "POST" }),
 };
 
 export { ApiError };

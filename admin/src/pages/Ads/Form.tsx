@@ -1,7 +1,12 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { ArrowsClockwise } from "@phosphor-icons/react";
 import { api } from "@/services/api";
 import type { Ad } from "@/types";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Button } from "@/components/ui/Button";
+import { Spinner } from "@/components/ui/Spinner";
+import { useToast } from "@/components/ui/Toast";
 
 function toDatetimeLocal(iso: string | null): string {
   if (!iso) return "";
@@ -14,6 +19,7 @@ export function AdForm() {
   const { id } = useParams<{ id: string }>();
   const isEdit = Boolean(id) && id !== "new";
   const navigate = useNavigate();
+  const toast = useToast();
 
   const [loading, setLoading] = useState(isEdit);
   const [saving, setSaving] = useState(false);
@@ -48,6 +54,20 @@ export function AdForm() {
     },
     []
   );
+
+  const [convertingExisting, setConvertingExisting] = useState(false);
+  const handleConvertExisting = async () => {
+    if (!existing) return;
+    setConvertingExisting(true);
+    try {
+      await api.convertAdMedia(existing.id);
+      toast.success("Đã thêm ảnh vào hàng đợi nén lại.");
+    } catch {
+      toast.error("Không thể thêm vào hàng đợi convert.");
+    } finally {
+      setConvertingExisting(false);
+    }
+  };
 
   useEffect(() => {
     if (!isEdit || !id) return;
@@ -92,6 +112,7 @@ export function AdForm() {
     try {
       if (isEdit && id) await api.updateAd(id, formData);
       else await api.createAd(formData);
+      toast.success(isEdit ? "Đã lưu quảng cáo." : "Đã tạo quảng cáo.");
       navigate("/ads");
     } catch {
       setError("Lưu quảng cáo thất bại.");
@@ -100,11 +121,11 @@ export function AdForm() {
     }
   };
 
-  if (loading) return <p className="text-slate-500">Đang tải...</p>;
+  if (loading) return <Spinner />;
 
   return (
     <div className="w-full">
-      <h1 className="mb-6 text-2xl font-bold text-slate-800">{isEdit ? "Sửa quảng cáo" : "Thêm quảng cáo"}</h1>
+      <PageHeader title={isEdit ? "Sửa quảng cáo" : "Thêm quảng cáo"} backTo="/ads" />
 
       <form onSubmit={handleSubmit} className="flex max-w-2xl flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
         <label className="text-sm">
@@ -164,17 +185,30 @@ export function AdForm() {
               {imagePreview && <p className="mt-1 text-xs font-medium text-sky-600">Ảnh mới - chưa lưu</p>}
             </div>
           )}
+          {isEdit && existing && !imagePreview && (
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              icon={<ArrowsClockwise size={14} />}
+              disabled={convertingExisting}
+              onClick={handleConvertExisting}
+              className="mt-2"
+            >
+              {convertingExisting ? "Đang thêm vào hàng đợi..." : "Nén lại ảnh hiện tại"}
+            </Button>
+          )}
         </label>
 
         {error && <p className="text-sm text-red-600">{error}</p>}
 
         <div className="flex gap-3 pt-2">
-          <button type="submit" disabled={saving} className="rounded-lg bg-sky-600 px-5 py-2.5 font-semibold text-white hover:bg-sky-700 disabled:opacity-50">
+          <Button type="submit" disabled={saving}>
             {saving ? "Đang lưu..." : "Lưu quảng cáo"}
-          </button>
-          <button type="button" onClick={() => navigate("/ads")} className="rounded-lg border border-slate-300 px-5 py-2.5 font-semibold text-slate-600">
+          </Button>
+          <Button type="button" variant="secondary" onClick={() => navigate("/ads")}>
             Huỷ
-          </button>
+          </Button>
         </div>
       </form>
     </div>

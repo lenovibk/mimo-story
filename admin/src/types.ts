@@ -33,6 +33,8 @@ export interface Story {
   episodeLabel: string | null;
   coverUrl: string;
   videoUrl: string | null;
+  videoSourceType: "UPLOAD" | "YOUTUBE";
+  youtubeId: string | null;
   subtitleEnUrl: string | null;
   subtitleViUrl: string | null;
   audioUrl: string | null;
@@ -50,6 +52,8 @@ export interface Story {
   createdAt: string;
   updatedAt: string;
   tags: string[];
+  videoConverting: boolean;
+  pendingVideoJobId?: string;
 }
 
 export interface UserListItem {
@@ -78,6 +82,23 @@ export interface UserDetail {
   plan: string;
   createdAt: string;
   children: ChildSummary[];
+}
+
+export interface ConversionJob {
+  id: string;
+  kind: "IMAGE" | "VIDEO";
+  status: "QUEUED" | "PROCESSING" | "DONE" | "FAILED";
+  sourceName: string;
+  sourceBytes: number;
+  outputBytes: number | null;
+  outputUrl: string | null;
+  progress: number;
+  error: string | null;
+  storyId: string | null;
+  story: { id: string; title: string } | null;
+  createdAt: string;
+  startedAt: string | null;
+  finishedAt: string | null;
 }
 
 export interface Ad {

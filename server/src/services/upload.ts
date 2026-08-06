@@ -24,12 +24,30 @@ export const uploadAdImage = multer({
   limits: { fileSize: 10 * 1024 * 1024 },
 }).single("image");
 
+/** Standalone Media Converter tool (admin/src/pages/Media) - one arbitrary image or video, not tied to a story/ad. */
+export const uploadConvertFile = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 300 * 1024 * 1024 },
+}).single("file");
+
 /** Writes an uploaded file's buffer to `<uploadDir>/<subpath>` and returns its public URL. */
 export async function saveUploadedFile(buffer: Buffer, subpath: string): Promise<string> {
   const target = path.join(uploadDir, subpath);
   await fs.mkdir(path.dirname(target), { recursive: true });
   await fs.writeFile(target, buffer);
   return `${publicBaseUrl}/uploads/${subpath.split(path.sep).join("/")}`;
+}
+
+/**
+ * Resolves `<uploadDir>/<subpath>` + its public URL without writing anything - for callers
+ * that write the file themselves (ffmpeg writing its webm output straight to disk instead
+ * of round-tripping through an in-memory buffer). Creates the parent directory so the
+ * writer doesn't have to.
+ */
+export async function resolveUploadTarget(subpath: string): Promise<{ path: string; url: string }> {
+  const target = path.join(uploadDir, subpath);
+  await fs.mkdir(path.dirname(target), { recursive: true });
+  return { path: target, url: `${publicBaseUrl}/uploads/${subpath.split(path.sep).join("/")}` };
 }
 
 const appBaseUrl = (process.env.PUBLIC_APP_BASE_URL || "http://localhost:3000").replace(/\/$/, "");
@@ -54,4 +72,33 @@ function extFromOriginalName(originalname: string): string {
 
 export function fileExt(file: Express.Multer.File | undefined): string {
   return file ? extFromOriginalName(file.originalname) : "";
+}
+
+const YOUTUBE_ID_RE = /^[\w-]{11}$/;
+
+/** Parses a YouTube video ID out of watch/share/embed/shorts URLs, or a bare 11-char ID. */
+export function extractYoutubeId(input: string): string | null {
+  const trimmed = input.trim();
+  if (YOUTUBE_ID_RE.test(trimmed)) return trimmed;
+
+  let url: URL;
+  try {
+    url = new URL(trimmed);
+  } catch {
+    return null;
+  }
+
+  let id: string | null = null;
+  if (url.hostname === "youtu.be") {
+    id = url.pathname.slice(1).split("/")[0] || null;
+  } else if (url.hostname.replace(/^www\./, "") === "youtube.com" || url.hostname.replace(/^www\./, "") === "m.youtube.com") {
+    if (url.pathname === "/watch") {
+      id = url.searchParams.get("v");
+    } else {
+      const match = url.pathname.match(/^\/(embed|shorts)\/([^/]+)/);
+      if (match) id = match[2];
+    }
+  }
+
+  return id && YOUTUBE_ID_RE.test(id) ? id : null;
 }

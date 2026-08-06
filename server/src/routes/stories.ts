@@ -22,6 +22,8 @@ router.get(
         episodeLabel: s.episodeLabel ?? undefined,
         cover: s.coverUrl,
         video: s.videoUrl ?? undefined,
+        videoSourceType: s.videoSourceType,
+        youtubeId: s.youtubeId ?? undefined,
         subtitleEn: s.subtitleEnUrl ?? undefined,
         subtitleVi: s.subtitleViUrl ?? undefined,
         audio: s.audioUrl ?? undefined,

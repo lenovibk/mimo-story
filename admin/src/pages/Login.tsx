@@ -1,7 +1,9 @@
 import { useState, type FormEvent } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
+import { Sparkle } from "@phosphor-icons/react";
 import { api, ApiError } from "@/services/api";
 import { useAdminAuthStore } from "@/store/useAdminAuthStore";
+import { Button } from "@/components/ui/Button";
 
 export function Login() {
   const navigate = useNavigate();
@@ -32,7 +34,12 @@ export function Login() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-50">
       <form onSubmit={handleSubmit} className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
-        <h1 className="mb-6 text-xl font-bold text-slate-800">MimoKids Admin</h1>
+        <div className="mb-6 flex items-center gap-2">
+          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-sky-100 text-sky-600">
+            <Sparkle size={20} weight="fill" />
+          </span>
+          <h1 className="text-xl font-bold text-slate-800">MimoKids Admin</h1>
+        </div>
         <label className="mb-3 block text-sm">
           <span className="mb-1 block font-medium text-slate-600">Email</span>
           <input
@@ -55,13 +62,9 @@ export function Login() {
           />
         </label>
         {error && <p className="mb-4 text-sm text-red-600">{error}</p>}
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full rounded-lg bg-sky-600 px-4 py-2.5 font-semibold text-white hover:bg-sky-700 disabled:opacity-50"
-        >
+        <Button type="submit" disabled={loading} className="w-full">
           {loading ? "Đang đăng nhập..." : "Đăng nhập"}
-        </button>
+        </Button>
       </form>
     </div>
   );

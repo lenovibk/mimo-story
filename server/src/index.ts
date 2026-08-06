@@ -13,6 +13,7 @@ import categoriesRouter from "./routes/categories.js";
 import programsRouter from "./routes/programs.js";
 import adsRouter from "./routes/ads.js";
 import adminRouter from "./routes/admin/index.js";
+import { recoverStaleJobs } from "./services/conversionQueue.js";
 import { uploadDir } from "./services/upload.js";
 
 const app = express();
@@ -44,6 +45,7 @@ app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
 });
 
 const port = Number(process.env.PORT) || 3001;
+recoverStaleJobs().catch((err) => console.error("Failed to recover stale conversion jobs:", err));
 app.listen(port, () => {
   console.log(`MimoKids API listening on http://localhost:${port}`);
 });
