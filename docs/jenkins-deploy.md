@@ -184,7 +184,7 @@ Xem chi tiết từng biến trong [`server/.env.example`](../server/.env.exampl
 
 Pipeline sẽ:
 1. Checkout code từ GitHub.
-2. Kiểm tra `server/.env`/`server/.env.production` đã tồn tại trên máy chủ.
+2. Ghi `server/.env`/`server/.env.production` ra workspace từ Jenkins Credentials.
 3. `docker compose build --pull` cho 3 service.
 4. `docker compose up -d --force-recreate` để thay container mới.
 5. `docker image prune -f` dọn image cũ.
@@ -206,3 +206,72 @@ docker compose logs -f server   # xem log migrate + API khởi động
 (Cổng lấy từ [`docker-compose.yml`](../docker-compose.yml); nếu máy chủ dùng
 reverse proxy/nginx riêng để map domain → các cổng này thì cấu hình đó nằm
 ngoài phạm vi file này.)
+
+## 7. `app/public/stories` không nằm trong git — deploy bằng cách nào?
+
+`app/public/stories` (~370MB+ webm/webp, xem
+[story-pipeline.md](story-pipeline.md)) cố tình **không** được commit lên
+GitHub: quá nặng cho một git repo, và một phần media gốc có bản quyền (xem
+comment trong [`.gitignore`](../.gitignore) — "not ours to redistribute").
+Nghĩa là khi Jenkins checkout code từ GitHub, thư mục này **sẽ không tồn
+tại** trong workspace, và nếu build image kiểu `COPY . .` như cũ thì app
+build ra sẽ thiếu hết video/ảnh truyện.
+
+Cách xử lý: **không** để `app/public/stories` phụ thuộc vào git/Docker image
+nữa — tách nó ra thành một thư mục riêng trên máy chủ, mount vào container
+lúc chạy (giống cách `server_uploads` đã tách khỏi image server). Cụ thể:
+
+- [`docker-compose.yml`](../docker-compose.yml) mount
+  `${STORIES_HOST_DIR:-/srv/mimokids/stories}` (thư mục thật trên máy chủ)
+  vào `/usr/share/nginx/html/stories` trong container `mimokids`, đè lên bất
+  cứ thứ gì Vite build ra ở đường dẫn đó (build ra rỗng cũng không sao).
+- File thật được đưa lên `/srv/mimokids/stories` trên máy chủ **độc lập với
+  Jenkins**, bằng script [`scripts/sync-stories.sh`](../scripts/sync-stories.sh)
+  (rsync qua SSH) chạy từ máy đang có đủ `app/public/stories` (máy dev, hoặc
+  máy vừa generate truyện mới theo story-pipeline.md).
+
+### Lần đầu setup trên máy chủ
+
+```bash
+ssh deploy@may-chu "mkdir -p /srv/mimokids/stories"
+```
+
+(Nếu muốn dùng đường dẫn khác, đặt biến môi trường `STORIES_HOST_DIR` trước
+khi chạy `docker compose`/Jenkins trên máy chủ đó — không cần sửa
+`docker-compose.yml`.)
+
+### Mỗi khi thêm truyện mới
+
+Từ máy đang có đủ `app/public/stories/storyNNN/` mới generate xong:
+
+```bash
+DEPLOY_HOST=deploy@may-chu ./scripts/sync-stories.sh
+```
+
+Script rsync thẳng lên `/srv/mimokids/stories` trên máy chủ. Vì đây là bind
+mount (không phải copy vào image), file mới có hiệu lực ngay — **không cần**
+build lại hay restart container `mimokids`. Việc này tách hoàn toàn khỏi
+pipeline Jenkins/GitHub ở các mục 1–6: push code lên GitHub để Jenkins deploy
+code (giao diện, logic, API...), còn media truyện thì rsync thẳng lên máy chủ
+theo hướng này.
+
+> Muốn để media đi qua đúng pipeline Jenkins thay vì rsync tay riêng, có thể
+> thêm 1 stage `sh 'rsync ...'` gọi kịch bản trên ngay trong Jenkinsfile, với
+> điều kiện Jenkins agent SSH được tới nơi lưu trữ media gốc — không làm sẵn
+> ở đây vì kho lưu trữ đó (máy dev cá nhân) thường không phải là thứ Jenkins
+> agent truy cập được.
+
+### Deploy thủ công bằng `deploy.sh`/`deploy.prod.sh` trên chính máy đang có `app/public/stories`
+
+Nếu bạn build/chạy trực tiếp trên máy đã có sẵn đầy đủ
+`app/public/stories` (ví dụ máy dev, không qua Jenkins), khỏi cần rsync —
+trỏ thẳng `STORIES_HOST_DIR` vào thư mục đó khi chạy compose:
+
+```bash
+STORIES_HOST_DIR="$(pwd)/app/public/stories" ./deploy.sh
+```
+
+Nếu không set biến này, mặc định là `/srv/mimokids/stories` — Docker sẽ tự
+tạo thư mục đó **rỗng** nếu chưa tồn tại (bind mount không báo lỗi khi thư
+mục nguồn chưa có), khiến app chạy lên nhưng thiếu hết video/ảnh truyện. Nhớ
+tạo/đồng bộ thư mục đó trước khi deploy lần đầu trên một máy chủ mới.

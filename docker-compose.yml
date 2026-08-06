@@ -5,6 +5,13 @@ services:
       dockerfile: Dockerfile
     ports:
       - "8986:80"
+    volumes:
+      # app/public/stories không nằm trong git (373MB+, media có bản quyền) nên
+      # không có sẵn khi Jenkins checkout code từ GitHub. Thư mục thật được rsync
+      # thẳng lên máy chủ (xem docs/jenkins-deploy.md) rồi mount đè vào đây, độc
+      # lập với build image. STORIES_HOST_DIR override qua biến môi trường/.env
+      # ở gốc repo nếu máy chủ dùng đường dẫn khác.
+      - ${STORIES_HOST_DIR:-/srv/mimokids/stories}:/usr/share/nginx/html/stories:ro
     restart: unless-stopped
 
   server:
