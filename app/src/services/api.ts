@@ -1,5 +1,5 @@
 import { useAuthStore } from "@/store/useAuthStore";
-import type { Ad, Category, Child, DashboardStats, Parent, Program, Story } from "@/types";
+import type { Ad, Category, Child, DashboardStats, GrammarPoint, Parent, Program, Story, VocabItem } from "@/types";
 
 const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3002/api";
 
@@ -92,6 +92,16 @@ export const api = {
 
   getActiveAds: (placement = "home_banner", age?: number) =>
     request<Ad[]>(`/ads/active?placement=${encodeURIComponent(placement)}${age != null ? `&age=${age}` : ""}`),
+
+  getStoryVocabulary: (storyId: string) => request<VocabItem[]>(`/stories/${storyId}/vocabulary`),
+  getStoryGrammar: (storyId: string) => request<GrammarPoint[]>(`/stories/${storyId}/grammar`),
+
+  getVocabProgress: (childId: string) => request<{ vocabId: string; status: string }[]>(`/children/${childId}/vocab-progress`),
+  setVocabProgress: (childId: string, vocabId: string, status: "known" | "new") =>
+    request<{ ok: true }>(`/children/${childId}/vocab-progress/${vocabId}`, {
+      method: "PUT",
+      body: JSON.stringify({ status }),
+    }),
 };
 
 export { ApiError };

@@ -47,6 +47,7 @@ model Child {
   favorites      Favorite[]
   storyProgress  StoryProgress[]
   dailyActivity  DailyActivity[]
+  vocabProgress  VocabProgress[]
 
   @@index([parentId])
 }
@@ -181,6 +182,8 @@ model Story {
   tags     StoryTagLink[]
   programs StoryProgramLink[]
   conversionJobs ConversionJob[]
+  vocabItems     VocabItem[]
+  grammarPoints  GrammarPoint[]
 
   @@index([categoryId])
 }
@@ -245,5 +248,71 @@ model ConversionJob {
 
   @@index([storyId])
   @@index([status])
+}
+
+/// One vocabulary word for a story's "Từ vựng" lesson panel. Optionally anchored to the
+/// EN subtitle cue it appears in (cueStart matches SubtitleItem.start in the app's SRT
+/// parser) so the player can highlight/tap the word at the right moment in the dialogue;
+/// cueText is a snapshot of that line's text at creation time, kept for admin context even
+/// if the underlying .srt is edited later. Word-tap opens a flashcard (meaning + example),
+/// self-checked via VocabProgress - no auto-graded quiz.
+model VocabItem {
+  id           String   @id @default(uuid())
+  storyId      String
+  story        Story    @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  cueStart     Float?
+  cueText      String?
+  word         String
+  /// IPA or simplified phonetic spelling, e.g. "/ˈbʌtərflaɪ/"
+  phonetic     String?
+  /// "noun" | "verb" | "adjective" | "adverb" | "phrase"
+  partOfSpeech String?
+  meaningVi    String
+  exampleEn    String
+  exampleVi    String
+  imageUrl     String?
+  order        Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  progress VocabProgress[]
+
+  @@index([storyId])
+}
+
+/// One grammar point for a story's "Ngữ pháp" lesson panel - same cue-anchoring idea as
+/// VocabItem, but usually spans a whole line rather than a single word.
+model GrammarPoint {
+  id            String   @id @default(uuid())
+  storyId       String
+  story         Story    @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  cueStart      Float?
+  cueText       String?
+  title         String
+  /// Short pattern, e.g. "S + am/is/are + V-ing"
+  structure     String?
+  explanationVi String
+  exampleEn     String
+  exampleVi     String
+  order         Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([storyId])
+}
+
+/// A child's self-check on one vocab word's flashcard ("Đã thuộc" / "Cần ôn thêm") -
+/// mirrors StoryProgress's per-child upsert shape.
+model VocabProgress {
+  id        String    @id @default(uuid())
+  childId   String
+  child     Child     @relation(fields: [childId], references: [id], onDelete: Cascade)
+  vocabId   String
+  vocab     VocabItem @relation(fields: [vocabId], references: [id], onDelete: Cascade)
+  /// "new" | "known"
+  status    String    @default("new")
+  updatedAt DateTime  @updatedAt
+
+  @@unique([childId, vocabId])
 }
 

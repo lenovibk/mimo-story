@@ -1,5 +1,5 @@
 import { PillButton } from "@/components/Button/Button";
-import { IconFace, IconFlagEn, IconFlagVi, IconMic, IconPause, IconPlay } from "@/components/Icon/Icon";
+import { IconBook, IconFace, IconFlagEn, IconFlagVi, IconMic, IconPause, IconPlay } from "@/components/Icon/Icon";
 
 interface FloatingButtonsProps {
   subtitleEnOn: boolean;
@@ -12,6 +12,8 @@ interface FloatingButtonsProps {
   onTogglePause: () => void;
   onPracticeSpeaking: () => void;
   practiceDisabled?: boolean;
+  /** Omitted when the story has no vocab/grammar content yet - hides the button entirely. */
+  onOpenVocab?: () => void;
 }
 
 export function FloatingButtons({
@@ -25,6 +27,7 @@ export function FloatingButtons({
   onTogglePause,
   onPracticeSpeaking,
   practiceDisabled,
+  onOpenVocab,
 }: FloatingButtonsProps) {
   return (
     <div className="absolute top-1/2 right-[max(0.5rem,var(--safe-r))] z-20 flex -translate-y-1/2 flex-col gap-2 sm:right-[max(1.5rem,var(--safe-r))] sm:gap-4 landscape-compact:right-[max(0.375rem,var(--safe-r))] landscape-compact:gap-1.5">
@@ -78,6 +81,15 @@ export function FloatingButtons({
         onClick={onPracticeSpeaking}
         ariaLabel="Practice speaking"
       />
+      {onOpenVocab && (
+        <PillButton
+          icon={<IconBook className="h-4 w-4 sm:h-6 sm:w-6" />}
+          label="Từ vựng"
+          color="yellow"
+          onClick={onOpenVocab}
+          ariaLabel="Xem từ vựng và ngữ pháp"
+        />
+      )}
     </div>
   );
 }

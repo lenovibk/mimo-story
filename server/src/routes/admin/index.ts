@@ -9,6 +9,8 @@ import programsRouter from "./programs.js";
 import usersRouter from "./users.js";
 import adsRouter from "./ads.js";
 import mediaJobsRouter from "./mediaJobs.js";
+import vocabularyRouter from "./vocabulary.js";
+import grammarRouter from "./grammar.js";
 
 const router = Router();
 
@@ -35,5 +37,7 @@ router.use("/programs", programsRouter);
 router.use("/users", usersRouter);
 router.use("/ads", adsRouter);
 router.use("/media-jobs", mediaJobsRouter);
+router.use("/vocabulary", vocabularyRouter);
+router.use("/grammar", grammarRouter);
 
 export default router;

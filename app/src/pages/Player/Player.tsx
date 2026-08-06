@@ -11,8 +11,11 @@ import { Countdown } from "@/components/Speech/Countdown";
 import { MicIndicator } from "@/components/Speech/MicIndicator";
 import { StoryEndDialog } from "@/components/StoryEndDialog/StoryEndDialog";
 import { Subtitle } from "@/components/Subtitle/Subtitle";
+import { VocabDeck } from "@/components/Vocabulary/VocabDeck";
+import { VocabFlashcard } from "@/components/Vocabulary/VocabFlashcard";
 import { useEnsureCatalogLoaded } from "@/hooks/useEnsureCatalogLoaded";
 import { findActiveCue, findNearestCue, useSubtitles } from "@/hooks/useSubtitles";
+import { useVocabulary, vocabForCue } from "@/hooks/useVocabulary";
 import { useYouTubePlayer } from "@/hooks/useYouTubePlayer";
 import { api } from "@/services/api";
 import { getAudioRecorder } from "@/services/Recording";
@@ -27,7 +30,8 @@ import { useAppStore } from "@/store/useAppStore";
 import { useAuthStore } from "@/store/useAuthStore";
 import { useCatalogStore } from "@/store/useCatalogStore";
 import { useFavoritesStore } from "@/store/useFavoritesStore";
-import type { PronunciationResult } from "@/types";
+import { useVocabProgressStore } from "@/store/useVocabProgressStore";
+import type { PronunciationResult, VocabItem } from "@/types";
 import { formatDuration } from "@/utils/time";
 
 type Phase = "idle" | "countdown" | "listening" | "reward";
@@ -62,6 +66,7 @@ export function Player() {
   const catalogLoaded = useCatalogStore((s) => s.loaded);
   const story = id ? stories.find((s) => s.id === id) : undefined;
   const { en, vi, loading } = useSubtitles(story);
+  const { vocab, grammar } = useVocabulary(story);
   const isYoutube = story?.videoSourceType === "YOUTUBE";
 
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -81,6 +86,8 @@ export function Player() {
   const [controlsVisible, setControlsVisible] = useState(true);
   const hideControlsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showEndDialog, setShowEndDialog] = useState(false);
+  const [tappedVocab, setTappedVocab] = useState<VocabItem | null>(null);
+  const [vocabDeckOpen, setVocabDeckOpen] = useState(false);
 
   const subtitleEnOn = useAppStore((s) => s.subtitleEnOn);
   const subtitleViOn = useAppStore((s) => s.subtitleViOn);
@@ -98,8 +105,58 @@ export function Player() {
   const toggleFavorite = useFavoritesStore((s) => s.toggleFavorite);
   const lastProgressSaveRef = useRef(0);
 
+  const isVocabKnown = useVocabProgressStore((s) => s.isKnown);
+  const setVocabKnown = useVocabProgressStore((s) => s.setKnown);
+  const loadVocabProgress = useVocabProgressStore((s) => s.loadProgress);
+  useEffect(() => {
+    loadVocabProgress(activeChildId).catch(() => {});
+  }, [activeChildId, loadVocabProgress]);
+
+  const handleToggleVocabKnown = (vocabId: string) => {
+    const alreadyKnown = isVocabKnown(activeChildId, vocabId);
+    void setVocabKnown(activeChildId, vocabId, !alreadyKnown);
+    // Only reward the first time a word flips to "known" - re-tapping to undo it (or
+    // re-marking it later) shouldn't farm stars.
+    if (!alreadyKnown) {
+      addStars(activeChildId, 5);
+      playSuccessCheer();
+    }
+  };
+
   const currentEnCue = useMemo(() => findActiveCue(en, currentTime), [en, currentTime]);
   const currentViCue = useMemo(() => findActiveCue(vi, currentTime), [vi, currentTime]);
+  const currentVocabWords = useMemo(() => vocabForCue(vocab, currentEnCue?.start), [vocab, currentEnCue]);
+
+  // Reading a flashcard/deck mid-playback shouldn't compete with the story still
+  // narrating in the background - pause for as long as it's open, same as scrubbing.
+  const wasPlayingBeforeVocabRef = useRef(false);
+  const pauseForVocab = () => {
+    wasPlayingBeforeVocabRef.current = !isPaused;
+    pauseMedia();
+    setIsPaused(true);
+  };
+  const resumeAfterVocab = () => {
+    if (wasPlayingBeforeVocabRef.current) {
+      playMedia();
+      setIsPaused(false);
+    }
+  };
+  const handleWordTap = (item: VocabItem) => {
+    pauseForVocab();
+    setTappedVocab(item);
+  };
+  const closeVocabFlashcard = () => {
+    setTappedVocab(null);
+    resumeAfterVocab();
+  };
+  const openVocabDeck = () => {
+    pauseForVocab();
+    setVocabDeckOpen(true);
+  };
+  const closeVocabDeck = () => {
+    setVocabDeckOpen(false);
+    resumeAfterVocab();
+  };
 
   const nextStory = useMemo(() => {
     if (!story) return undefined;
@@ -454,6 +511,8 @@ export function Player() {
         currentTime={currentTime}
         showEn={subtitleEnOn}
         showVi={subtitleViOn}
+        vocabWords={phase === "idle" ? currentVocabWords : undefined}
+        onWordTap={handleWordTap}
       />
 
       <div
@@ -472,6 +531,7 @@ export function Player() {
           onTogglePause={handleTogglePause}
           onPracticeSpeaking={startPractice}
           practiceDisabled={phase !== "idle" || loading}
+          onOpenVocab={vocab.length > 0 || grammar.length > 0 ? openVocabDeck : undefined}
         />
       </div>
 
@@ -504,6 +564,29 @@ export function Player() {
             onToggleAutoPlay={toggleAutoPlayNext}
             onBackToList={() => navigate("/home")}
             onContinue={handleContinueNext}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {vocabDeckOpen && (
+          <VocabDeck
+            vocab={vocab}
+            grammar={grammar}
+            isKnown={(vocabId) => isVocabKnown(activeChildId, vocabId)}
+            onToggleKnown={handleToggleVocabKnown}
+            onClose={closeVocabDeck}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {tappedVocab && (
+          <VocabFlashcard
+            item={tappedVocab}
+            known={isVocabKnown(activeChildId, tappedVocab.id)}
+            onClose={closeVocabFlashcard}
+            onToggleKnown={() => handleToggleVocabKnown(tappedVocab.id)}
           />
         )}
       </AnimatePresence>

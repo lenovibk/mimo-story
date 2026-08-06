@@ -115,3 +115,33 @@ export interface Ad {
   priority: number;
   createdAt: string;
 }
+
+export interface VocabItem {
+  id: string;
+  storyId: string;
+  /** Start time (seconds) of the EN subtitle cue this word was picked from - null if not tied to one. */
+  cueStart: number | null;
+  /** Snapshot of that cue's full text, kept for context even if the .srt is edited later. */
+  cueText: string | null;
+  word: string;
+  phonetic: string | null;
+  partOfSpeech: string | null;
+  meaningVi: string;
+  exampleEn: string;
+  exampleVi: string;
+  imageUrl: string | null;
+  order: number;
+}
+
+export interface GrammarPoint {
+  id: string;
+  storyId: string;
+  cueStart: number | null;
+  cueText: string | null;
+  title: string;
+  structure: string | null;
+  explanationVi: string;
+  exampleEn: string;
+  exampleVi: string;
+  order: number;
+}

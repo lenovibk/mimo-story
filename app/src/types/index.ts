@@ -111,6 +111,31 @@ export interface WordMatch {
   matched: boolean;
 }
 
+/** One vocabulary word for a story's lesson panel - optionally anchored to the EN subtitle
+ * cue it's spoken in (cueStart matches SubtitleItem.start) so the player can highlight/tap
+ * it at the right moment. Admin-managed, see server VocabItem model. */
+export interface VocabItem {
+  id: string;
+  cueStart: number | null;
+  word: string;
+  phonetic: string | null;
+  partOfSpeech: string | null;
+  meaningVi: string;
+  exampleEn: string;
+  exampleVi: string;
+  imageUrl: string | null;
+}
+
+export interface GrammarPoint {
+  id: string;
+  cueStart: number | null;
+  title: string;
+  structure: string | null;
+  explanationVi: string;
+  exampleEn: string;
+  exampleVi: string;
+}
+
 export interface PronunciationResult {
   transcript: string;
   stars: StarRating;

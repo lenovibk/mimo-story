@@ -26,7 +26,8 @@ import {
   SoccerBall,
   Star,
   Tree,
-  UserFocus
+  UserFocus,
+  X
 } from "@phosphor-icons/react";
 
 type IconProps = SVGProps<SVGSVGElement>;
@@ -75,6 +76,10 @@ export function IconStarOutline({ className, ...props }: IconProps) {
 
 export function IconCheck({ className, ...props }: IconProps) {
   return <Check weight="bold" className={base(className)} {...props} />;
+}
+
+export function IconX({ className, ...props }: IconProps) {
+  return <X weight="bold" className={base(className)} {...props} />;
 }
 
 export function IconHeart({ className, ...props }: IconProps) {

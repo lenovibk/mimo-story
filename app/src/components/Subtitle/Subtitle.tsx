@@ -1,6 +1,6 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { useMemo } from "react";
-import type { SubtitleItem } from "@/types";
+import type { SubtitleItem, VocabItem } from "@/types";
 
 interface SubtitleProps {
   enCue?: SubtitleItem;
@@ -8,6 +8,14 @@ interface SubtitleProps {
   currentTime: number;
   showEn: boolean;
   showVi: boolean;
+  /** Vocab words anchored to the current EN cue - rendered as tappable highlights instead of
+   * plain text (see useVocabulary's vocabForCue). Empty when the cue has no vocab attached. */
+  vocabWords?: VocabItem[];
+  onWordTap?: (item: VocabItem) => void;
+}
+
+function stripPunctuation(word: string): string {
+  return word.replace(/[.,!?;:"'“”‘’]/g, "").toLowerCase();
 }
 
 function useActiveWordIndex(cue: SubtitleItem | undefined, time: number, wordCount: number) {
@@ -20,9 +28,14 @@ function useActiveWordIndex(cue: SubtitleItem | undefined, time: number, wordCou
   }, [cue, time, wordCount]);
 }
 
-export function Subtitle({ enCue, viCue, currentTime, showEn, showVi }: SubtitleProps) {
+export function Subtitle({ enCue, viCue, currentTime, showEn, showVi, vocabWords, onWordTap }: SubtitleProps) {
   const enWords = useMemo(() => enCue?.text.split(/\s+/).filter(Boolean) ?? [], [enCue]);
   const activeIndex = useActiveWordIndex(enCue, currentTime, enWords.length);
+  const vocabByWord = useMemo(() => {
+    const map = new Map<string, VocabItem>();
+    for (const v of vocabWords ?? []) map.set(stripPunctuation(v.word), v);
+    return map;
+  }, [vocabWords]);
 
   if ((!enCue && !viCue) || (!showEn && !showVi)) return null;
 
@@ -39,18 +52,38 @@ export function Subtitle({ enCue, viCue, currentTime, showEn, showVi }: Subtitle
         >
           {showEn && enCue && (
             <p className="font-heading text-lg leading-snug font-bold text-white sm:text-4xl landscape-compact:text-sm">
-              {enWords.map((word, i) => (
-                <span
-                  key={i}
-                  className="mx-1 inline-block transition-colors duration-150"
-                  style={{
-                    color: i === activeIndex ? "#FFD54A" : "#FFFFFF",
-                    transform: i === activeIndex ? "scale(1.08)" : "scale(1)",
-                  }}
-                >
-                  {word}
-                </span>
-              ))}
+              {enWords.map((word, i) => {
+                const vocabItem = vocabByWord.get(stripPunctuation(word));
+                const isActive = i === activeIndex;
+                if (vocabItem && onWordTap) {
+                  return (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onWordTap(vocabItem);
+                      }}
+                      className="pointer-events-auto mx-1 inline-block rounded-md underline decoration-2 decoration-dotted underline-offset-4 transition-colors duration-150"
+                      style={{ color: isActive ? "#FFD54A" : "#5CC8FF", transform: isActive ? "scale(1.08)" : "scale(1)" }}
+                    >
+                      {word}
+                    </button>
+                  );
+                }
+                return (
+                  <span
+                    key={i}
+                    className="mx-1 inline-block transition-colors duration-150"
+                    style={{
+                      color: isActive ? "#FFD54A" : "#FFFFFF",
+                      transform: isActive ? "scale(1.08)" : "scale(1)",
+                    }}
+                  >
+                    {word}
+                  </span>
+                );
+              })}
             </p>
           )}
           {showVi && viCue && (

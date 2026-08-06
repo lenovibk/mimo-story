@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowsClockwise, BookOpen, Plus } from "@phosphor-icons/react";
+import { ArrowsClockwise, BookOpen, GraduationCap, Plus } from "@phosphor-icons/react";
 import { api, ApiError } from "@/services/api";
 import type { Category, Program, Story } from "@/types";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -274,6 +274,14 @@ export function StoriesList() {
                     <td className="px-4 py-2 text-right whitespace-nowrap">
                       <Link to={`/stories/${s.id}`} className="mr-3 font-medium text-sky-600 hover:underline">
                         Sửa
+                      </Link>
+                      <Link
+                        to={`/stories/${s.id}/vocabulary`}
+                        title="Quản lý từ vựng & ngữ pháp"
+                        className="mr-3 inline-flex items-center gap-1 font-medium text-sky-600 hover:underline"
+                      >
+                        <GraduationCap size={14} />
+                        Từ vựng
                       </Link>
                       {s.videoSourceType !== "YOUTUBE" && !isStoryConverted(s) && (
                         <button

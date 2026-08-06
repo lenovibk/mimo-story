@@ -1,5 +1,5 @@
 import { useAdminAuthStore } from "@/store/useAdminAuthStore";
-import type { Ad, AdminUser, Category, ConversionJob, Program, Story, UserDetail, UserListItem } from "@/types";
+import type { Ad, AdminUser, Category, ConversionJob, GrammarPoint, Program, Story, UserDetail, UserListItem, VocabItem } from "@/types";
 
 const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3002/api";
 
@@ -112,6 +112,24 @@ export const api = {
   getMediaJob: (id: string) => request<ConversionJob>(`/admin/media-jobs/${id}`),
   convertMedia: (formData: FormData) => request<{ jobId: string }>("/admin/media-jobs/convert", { method: "POST", body: formData }),
   backfillMediaJobs: () => request<{ enqueued: number }>("/admin/media-jobs/backfill", { method: "POST" }),
+
+  getVocabulary: (storyId: string) => request<VocabItem[]>(`/admin/vocabulary${toQueryString({ storyId })}`),
+  createVocabItem: (input: Omit<VocabItem, "id" | "order">) =>
+    request<VocabItem>("/admin/vocabulary", { method: "POST", body: JSON.stringify(input) }),
+  updateVocabItem: (id: string, input: Partial<Omit<VocabItem, "id" | "storyId">>) =>
+    request<VocabItem>(`/admin/vocabulary/${id}`, { method: "PATCH", body: JSON.stringify(input) }),
+  deleteVocabItem: (id: string) => request<void>(`/admin/vocabulary/${id}`, { method: "DELETE" }),
+  reorderVocabulary: (storyId: string, ids: string[]) =>
+    request<{ ok: true }>("/admin/vocabulary/reorder", { method: "PUT", body: JSON.stringify({ storyId, ids }) }),
+
+  getGrammar: (storyId: string) => request<GrammarPoint[]>(`/admin/grammar${toQueryString({ storyId })}`),
+  createGrammarPoint: (input: Omit<GrammarPoint, "id" | "order">) =>
+    request<GrammarPoint>("/admin/grammar", { method: "POST", body: JSON.stringify(input) }),
+  updateGrammarPoint: (id: string, input: Partial<Omit<GrammarPoint, "id" | "storyId">>) =>
+    request<GrammarPoint>(`/admin/grammar/${id}`, { method: "PATCH", body: JSON.stringify(input) }),
+  deleteGrammarPoint: (id: string) => request<void>(`/admin/grammar/${id}`, { method: "DELETE" }),
+  reorderGrammar: (storyId: string, ids: string[]) =>
+    request<{ ok: true }>("/admin/grammar/reorder", { method: "PUT", body: JSON.stringify({ storyId, ids }) }),
 };
 
 export { ApiError };
