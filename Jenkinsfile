@@ -53,12 +53,12 @@ pipeline {
                 // trong Jenkins Credentials (kiểu "Secret file", tạo qua web UI —
                 // xem docs/jenkins-deploy.md mục 4) và Jenkins tự ghi ra workspace
                 // ở đây, ngay trước khi build.
-                withCredentials([file(credentialsId: 'mimokids-server-env', variable: 'ENV_FILE')]) {
+                withCredentials([file(credentialsId: 'mimokis-api-env-prod', variable: 'ENV_FILE')]) {
                     sh 'cp "$ENV_FILE" server/.env'
                 }
                 script {
                     if (params.ENVIRONMENT == 'production') {
-                        withCredentials([file(credentialsId: 'mimokids-server-env-production', variable: 'ENV_FILE_PROD')]) {
+                        withCredentials([file(credentialsId: 'mimokis-api-env-prod', variable: 'ENV_FILE_PROD')]) {
                             sh 'cp "$ENV_FILE_PROD" server/.env.production'
                         }
                     }
