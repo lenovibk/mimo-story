@@ -17,7 +17,7 @@ export interface ChildSettings {
   dailyLimitMinutes: number | null;
 }
 
-const DEFAULT_SETTINGS: Omit<ChildSettings, "language"> = {
+const DEFAULT_SETTINGS_BASE: Omit<ChildSettings, "language"> = {
   subtitleEnOn: true,
   subtitleViOn: true,
   autoPlayNext: false,
@@ -25,6 +25,17 @@ const DEFAULT_SETTINGS: Omit<ChildSettings, "language"> = {
   soundEffectsOn: true,
   soundEffectsVolume: 1,
   dailyLimitMinutes: null,
+};
+
+// `getSettings` returns one of these two fixed objects (never a fresh literal) when a child has
+// no saved settings yet. Zustand v5's subscription is built on useSyncExternalStore, which requires
+// getSnapshot to return a referentially stable value for an unchanged state slice - a selector like
+// `useSettingsStore((s) => s.getSettings(childId))` that built `{ ...DEFAULT_SETTINGS, ... }` fresh on
+// every call broke that contract and produced a render loop (React error #185 - blank screen) for
+// every child that hadn't customized any setting yet, i.e. everyone on first load of this feature.
+const DEFAULT_SETTINGS_BY_LANGUAGE: Record<Language, ChildSettings> = {
+  vi: { ...DEFAULT_SETTINGS_BASE, language: "vi" },
+  en: { ...DEFAULT_SETTINGS_BASE, language: "en" },
 };
 
 function todayKey(): string {
@@ -56,7 +67,7 @@ export const useSettingsStore = create<SettingsState>()(
       getSettings: (childId) => {
         const state = get();
         const existing = childId ? state.settingsByChild[childId] : undefined;
-        return existing ?? { ...DEFAULT_SETTINGS, language: state.lastLanguage };
+        return existing ?? DEFAULT_SETTINGS_BY_LANGUAGE[state.lastLanguage];
       },
 
       updateSettings: (childId, patch) =>
