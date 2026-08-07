@@ -5,6 +5,7 @@ import { AdForm } from "@/pages/Ads/Form";
 import { AdsList } from "@/pages/Ads/List";
 import { CategoriesList } from "@/pages/Categories/List";
 import { Dashboard } from "@/pages/Dashboard";
+import { FilesManager } from "@/pages/Files/FilesManager";
 import { Login } from "@/pages/Login";
 import { MediaMonitor } from "@/pages/Media/Monitor";
 import { ProgramsList } from "@/pages/Programs/List";
@@ -34,6 +35,7 @@ function App() {
             <Route path="/ads/new" element={<AdForm />} />
             <Route path="/ads/:id" element={<AdForm />} />
             <Route path="/media" element={<MediaMonitor />} />
+            <Route path="/files" element={<FilesManager />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

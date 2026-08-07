@@ -3,6 +3,7 @@ import { NavLink, Navigate, Outlet } from "react-router-dom";
 import {
   BookOpen,
   FilmStrip,
+  FolderOpen,
   List,
   Megaphone,
   SignOut,
@@ -22,6 +23,7 @@ const NAV = [
   { to: "/users", label: "Người dùng", icon: Users },
   { to: "/ads", label: "Quảng cáo", icon: Megaphone },
   { to: "/media", label: "Media", icon: FilmStrip },
+  { to: "/files", label: "Quản lý file", icon: FolderOpen },
 ];
 
 function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {

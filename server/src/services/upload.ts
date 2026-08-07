@@ -30,12 +30,23 @@ export const uploadConvertFile = multer({
   limits: { fileSize: 300 * 1024 * 1024 },
 }).single("file");
 
+/** File Manager (admin/src/pages/Files) - arbitrary batch of files dropped/picked into a folder. */
+export const uploadFilesToDir = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 300 * 1024 * 1024, files: 50 },
+}).array("files", 50);
+
+/** Public URL for a `<uploadDir>`-relative subpath, e.g. `stories/abc/cover.webp`. */
+export function toPublicUrl(subpath: string): string {
+  return `${publicBaseUrl}/uploads/${subpath.split(path.sep).join("/")}`;
+}
+
 /** Writes an uploaded file's buffer to `<uploadDir>/<subpath>` and returns its public URL. */
 export async function saveUploadedFile(buffer: Buffer, subpath: string): Promise<string> {
   const target = path.join(uploadDir, subpath);
   await fs.mkdir(path.dirname(target), { recursive: true });
   await fs.writeFile(target, buffer);
-  return `${publicBaseUrl}/uploads/${subpath.split(path.sep).join("/")}`;
+  return toPublicUrl(subpath);
 }
 
 /**
@@ -47,7 +58,7 @@ export async function saveUploadedFile(buffer: Buffer, subpath: string): Promise
 export async function resolveUploadTarget(subpath: string): Promise<{ path: string; url: string }> {
   const target = path.join(uploadDir, subpath);
   await fs.mkdir(path.dirname(target), { recursive: true });
-  return { path: target, url: `${publicBaseUrl}/uploads/${subpath.split(path.sep).join("/")}` };
+  return { path: target, url: toPublicUrl(subpath) };
 }
 
 const appBaseUrl = (process.env.PUBLIC_APP_BASE_URL || "http://localhost:3000").replace(/\/$/, "");

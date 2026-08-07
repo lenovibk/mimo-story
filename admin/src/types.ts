@@ -4,6 +4,16 @@ export interface AdminUser {
   role: string;
 }
 
+export interface FileEntry {
+  name: string;
+  /** Slash-separated, relative to the uploads root. */
+  path: string;
+  type: "folder" | "file";
+  size: number | null;
+  mtime: string;
+  url: string | null;
+}
+
 export interface Category {
   id: string;
   slug: string;

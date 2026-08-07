@@ -1,5 +1,5 @@
 import { useAdminAuthStore } from "@/store/useAdminAuthStore";
-import type { Ad, AdminUser, Category, ConversionJob, GrammarPoint, Program, Story, UserDetail, UserListItem, VocabItem } from "@/types";
+import type { Ad, AdminUser, Category, ConversionJob, FileEntry, GrammarPoint, Program, Story, UserDetail, UserListItem, VocabItem } from "@/types";
 
 const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3002/api";
 
@@ -130,6 +130,23 @@ export const api = {
   deleteGrammarPoint: (id: string) => request<void>(`/admin/grammar/${id}`, { method: "DELETE" }),
   reorderGrammar: (storyId: string, ids: string[]) =>
     request<{ ok: true }>("/admin/grammar/reorder", { method: "PUT", body: JSON.stringify({ storyId, ids }) }),
+
+  getFiles: (path: string) => request<{ path: string; entries: FileEntry[] }>(`/admin/files${toQueryString({ path })}`),
+  createFolder: (path: string, name: string) =>
+    request<FileEntry>("/admin/files/folder", { method: "POST", body: JSON.stringify({ path, name }) }),
+  uploadFiles: (path: string, files: File[]) => {
+    const fd = new FormData();
+    fd.set("path", path);
+    files.forEach((f) => fd.append("files", f));
+    return request<{ entries: FileEntry[] }>("/admin/files/upload", { method: "POST", body: fd });
+  },
+  renameFile: (path: string, name: string) =>
+    request<FileEntry>("/admin/files/rename", { method: "PATCH", body: JSON.stringify({ path, name }) }),
+  moveFile: (path: string, targetPath: string) =>
+    request<FileEntry>("/admin/files/move", { method: "POST", body: JSON.stringify({ path, targetPath }) }),
+  deleteFiles: (paths: string[]) => request<void>("/admin/files", { method: "DELETE", body: JSON.stringify({ paths }) }),
+  extractZip: (path: string, deleteSource: boolean) =>
+    request<{ folder: FileEntry; fileCount: number }>("/admin/files/extract", { method: "POST", body: JSON.stringify({ path, deleteSource }) }),
 };
 
 export { ApiError };
