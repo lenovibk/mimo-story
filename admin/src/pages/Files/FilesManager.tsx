@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type DragEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type DragEvent, type MouseEvent, type ReactNode } from "react";
 import {
   ArrowsOutCardinal,
   CaretRight,
@@ -11,10 +11,12 @@ import {
   FileZip,
   FolderPlus,
   FolderSimple,
+  GridFour,
   HouseSimple,
   Image as ImageIcon,
   LinkSimple,
   PencilSimple,
+  Rows,
   TrashSimple,
   UploadSimple,
 } from "@phosphor-icons/react";
@@ -27,7 +29,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { SearchInput } from "@/components/ui/SearchInput";
 import { useToast } from "@/components/ui/Toast";
 import { useConfirmDialog } from "@/components/ui/ConfirmDialog";
-import { BulkActionButton, BulkActionsBar } from "@/components/ui/BulkActionsBar";
+import { BulkActionButton, BulkActionsBar, HeaderCheckbox } from "@/components/ui/BulkActionsBar";
 
 function formatBytes(bytes: number | null): string {
   if (bytes == null) return "—";
@@ -90,6 +92,7 @@ export function FilesManager() {
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [uploading, setUploading] = useState(false);
+  const [viewMode, setViewMode] = useState<"grid" | "list">(() => (localStorage.getItem("mimokids-files-view") === "list" ? "list" : "grid"));
 
   const [draggingPath, setDraggingPath] = useState<string | null>(null);
   const [dragOverPath, setDragOverPath] = useState<string | null>(null);
@@ -125,7 +128,12 @@ export function FilesManager() {
     load(currentPath);
   }, [currentPath, load]);
 
+  useEffect(() => {
+    localStorage.setItem("mimokids-files-view", viewMode);
+  }, [viewMode]);
+
   const visibleEntries = search.trim() ? entries.filter((e) => e.name.toLowerCase().includes(search.trim().toLowerCase())) : entries;
+  const allVisibleSelected = visibleEntries.length > 0 && visibleEntries.every((e) => selected.has(e.path));
 
   const navigate = (path: string) => {
     setSearch("");
@@ -141,6 +149,10 @@ export function FilesManager() {
       else next.add(path);
       return next;
     });
+  };
+
+  const toggleSelectAll = () => {
+    setSelected(allVisibleSelected ? new Set() : new Set(visibleEntries.map((e) => e.path)));
   };
 
   const handleCreateFolder = async () => {
@@ -264,6 +276,131 @@ export function FilesManager() {
 
   const selectedEntries = entries.filter((e) => selected.has(e.path));
 
+  /** Drag/select/navigate behaviour shared by the grid card and the list row for a given entry. */
+  function entryInteractionProps(entry: FileEntry) {
+    const isFolder = entry.type === "folder";
+    return {
+      draggable: true,
+      onDragStart: (e: DragEvent) => {
+        e.stopPropagation();
+        setDraggingPath(entry.path);
+        e.dataTransfer.effectAllowed = "move";
+        e.dataTransfer.setData("text/plain", entry.path);
+      },
+      onDragEnd: () => {
+        setDraggingPath(null);
+        setDragOverPath(null);
+      },
+      onDragOver: (e: DragEvent) => {
+        if (isFolder && draggingPath && draggingPath !== entry.path) {
+          e.preventDefault();
+          e.stopPropagation();
+          setDragOverPath(entry.path);
+        }
+      },
+      onDragLeave: () => setDragOverPath((p) => (p === entry.path ? null : p)),
+      onDrop: (e: DragEvent) => {
+        if (isFolder && draggingPath) {
+          e.preventDefault();
+          e.stopPropagation();
+          setDragOverPath(null);
+          handleDropMove(draggingPath, entry.path);
+        }
+      },
+      onClick: (e: MouseEvent) => {
+        e.stopPropagation();
+        setMenuFor(null);
+        toggleSelect(entry.path, !e.ctrlKey && !e.metaKey);
+      },
+      onDoubleClick: () => {
+        if (isFolder) navigate(entry.path);
+        else if (entry.url) window.open(entry.url, "_blank", "noopener");
+      },
+      title: `${entry.name}${isFolder ? "" : ` · ${formatBytes(entry.size)}`} · ${formatDate(entry.mtime)}`,
+    };
+  }
+
+  /** The "..." dropdown shown on both the grid card and the list row. */
+  function renderEntryMenu(entry: FileEntry): ReactNode {
+    if (menuFor !== entry.path) return null;
+    const isFolder = entry.type === "folder";
+    return (
+      <div onClick={(e) => e.stopPropagation()} className="absolute right-0 top-8 z-20 w-44 rounded-xl border border-slate-200 bg-white py-1 text-sm shadow-lg">
+        <button
+          type="button"
+          onClick={() => {
+            setMenuFor(null);
+            setRenameTarget(entry);
+            setRenameValue(entry.name);
+          }}
+          className="flex w-full items-center gap-2 px-3 py-2 text-left text-slate-600 hover:bg-slate-50"
+        >
+          <PencilSimple size={15} /> Đổi tên
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setMenuFor(null);
+            openMoveDialog(entry);
+          }}
+          className="flex w-full items-center gap-2 px-3 py-2 text-left text-slate-600 hover:bg-slate-50"
+        >
+          <ArrowsOutCardinal size={15} /> Di chuyển đến...
+        </button>
+        {!isFolder && isZip(entry.name) && (
+          <button
+            type="button"
+            onClick={() => {
+              setMenuFor(null);
+              setExtractTarget(entry);
+              setExtractDeleteSource(false);
+            }}
+            className="flex w-full items-center gap-2 px-3 py-2 text-left text-slate-600 hover:bg-slate-50"
+          >
+            <FileZip size={15} /> Giải nén
+          </button>
+        )}
+        {!isFolder && entry.url && (
+          <>
+            <button
+              type="button"
+              onClick={() => {
+                setMenuFor(null);
+                window.open(entry.url!, "_blank", "noopener");
+              }}
+              className="flex w-full items-center gap-2 px-3 py-2 text-left text-slate-600 hover:bg-slate-50"
+            >
+              <DownloadSimple size={15} /> Mở / Tải xuống
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setMenuFor(null);
+                navigator.clipboard.writeText(entry.url!).then(
+                  () => toast.success("Đã copy link."),
+                  () => toast.error("Copy thất bại.")
+                );
+              }}
+              className="flex w-full items-center gap-2 px-3 py-2 text-left text-slate-600 hover:bg-slate-50"
+            >
+              <LinkSimple size={15} /> Copy link
+            </button>
+          </>
+        )}
+        <button
+          type="button"
+          onClick={() => {
+            setMenuFor(null);
+            handleDelete([entry]);
+          }}
+          className="flex w-full items-center gap-2 px-3 py-2 text-left text-red-500 hover:bg-red-50"
+        >
+          <TrashSimple size={15} /> Xoá
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div onClick={() => setMenuFor(null)}>
       <PageHeader
@@ -335,6 +472,31 @@ export function FilesManager() {
         <SearchInput placeholder="Tìm trong thư mục..." value={search} onChange={(e) => setSearch(e.target.value)} />
       </div>
 
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <label className="flex items-center gap-2 text-sm text-slate-500">
+          <HeaderCheckbox checked={allVisibleSelected} onChange={toggleSelectAll} disabled={visibleEntries.length === 0} />
+          Chọn tất cả{visibleEntries.length > 0 ? ` (${visibleEntries.length})` : ""}
+        </label>
+        <div className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white p-0.5">
+          <button
+            type="button"
+            onClick={() => setViewMode("grid")}
+            title="Dạng lưới"
+            className={`rounded-md p-1.5 ${viewMode === "grid" ? "bg-sky-100 text-sky-700" : "text-slate-400 hover:bg-slate-50"}`}
+          >
+            <GridFour size={16} weight="bold" />
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewMode("list")}
+            title="Dạng danh sách"
+            className={`rounded-md p-1.5 ${viewMode === "list" ? "bg-sky-100 text-sky-700" : "text-slate-400 hover:bg-slate-50"}`}
+          >
+            <Rows size={16} weight="bold" />
+          </button>
+        </div>
+      </div>
+
       <BulkActionsBar count={selected.size} onClear={() => setSelected(new Set())}>
         <BulkActionButton onClick={() => openMoveDialog(selectedEntries)}>Di chuyển</BulkActionButton>
         <BulkActionButton variant="danger" onClick={() => handleDelete(selectedEntries)}>
@@ -366,7 +528,7 @@ export function FilesManager() {
             title={search ? "Không tìm thấy file phù hợp" : "Thư mục trống"}
             description={search ? undefined : "Kéo thả file vào đây hoặc bấm “Tải file lên”."}
           />
-        ) : (
+        ) : viewMode === "grid" ? (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
             {visibleEntries.map((entry) => {
               const isFolder = entry.type === "folder";
@@ -378,43 +540,7 @@ export function FilesManager() {
               return (
                 <div
                   key={entry.path}
-                  draggable
-                  onDragStart={(e) => {
-                    e.stopPropagation();
-                    setDraggingPath(entry.path);
-                    e.dataTransfer.effectAllowed = "move";
-                    e.dataTransfer.setData("text/plain", entry.path);
-                  }}
-                  onDragEnd={() => {
-                    setDraggingPath(null);
-                    setDragOverPath(null);
-                  }}
-                  onDragOver={(e) => {
-                    if (isFolder && draggingPath && draggingPath !== entry.path) {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      setDragOverPath(entry.path);
-                    }
-                  }}
-                  onDragLeave={() => setDragOverPath((p) => (p === entry.path ? null : p))}
-                  onDrop={(e) => {
-                    if (isFolder && draggingPath) {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      setDragOverPath(null);
-                      handleDropMove(draggingPath, entry.path);
-                    }
-                  }}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setMenuFor(null);
-                    toggleSelect(entry.path, !e.ctrlKey && !e.metaKey);
-                  }}
-                  onDoubleClick={() => {
-                    if (isFolder) navigate(entry.path);
-                    else if (entry.url) window.open(entry.url, "_blank", "noopener");
-                  }}
-                  title={`${entry.name}${isFolder ? "" : ` · ${formatBytes(entry.size)}`} · ${formatDate(entry.mtime)}`}
+                  {...entryInteractionProps(entry)}
                   className={`group relative flex cursor-pointer flex-col rounded-2xl border p-3 shadow-sm transition-colors ${
                     isDragOver
                       ? "border-sky-400 bg-sky-50"
@@ -456,87 +582,80 @@ export function FilesManager() {
                   </p>
                   {!isFolder && <p className="text-center text-[11px] text-slate-400">{formatBytes(entry.size)}</p>}
 
-                  {menuFor === entry.path && (
-                    <div
-                      onClick={(e) => e.stopPropagation()}
-                      className="absolute right-2 top-9 z-20 w-44 rounded-xl border border-slate-200 bg-white py-1 text-sm shadow-lg"
-                    >
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setMenuFor(null);
-                          setRenameTarget(entry);
-                          setRenameValue(entry.name);
-                        }}
-                        className="flex w-full items-center gap-2 px-3 py-2 text-left text-slate-600 hover:bg-slate-50"
-                      >
-                        <PencilSimple size={15} /> Đổi tên
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setMenuFor(null);
-                          openMoveDialog(entry);
-                        }}
-                        className="flex w-full items-center gap-2 px-3 py-2 text-left text-slate-600 hover:bg-slate-50"
-                      >
-                        <ArrowsOutCardinal size={15} /> Di chuyển đến...
-                      </button>
-                      {!isFolder && isZip(entry.name) && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setMenuFor(null);
-                            setExtractTarget(entry);
-                            setExtractDeleteSource(false);
-                          }}
-                          className="flex w-full items-center gap-2 px-3 py-2 text-left text-slate-600 hover:bg-slate-50"
-                        >
-                          <FileZip size={15} /> Giải nén
-                        </button>
-                      )}
-                      {!isFolder && entry.url && (
-                        <>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setMenuFor(null);
-                              window.open(entry.url!, "_blank", "noopener");
-                            }}
-                            className="flex w-full items-center gap-2 px-3 py-2 text-left text-slate-600 hover:bg-slate-50"
-                          >
-                            <DownloadSimple size={15} /> Mở / Tải xuống
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setMenuFor(null);
-                              navigator.clipboard.writeText(entry.url!).then(
-                                () => toast.success("Đã copy link."),
-                                () => toast.error("Copy thất bại.")
-                              );
-                            }}
-                            className="flex w-full items-center gap-2 px-3 py-2 text-left text-slate-600 hover:bg-slate-50"
-                          >
-                            <LinkSimple size={15} /> Copy link
-                          </button>
-                        </>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setMenuFor(null);
-                          handleDelete([entry]);
-                        }}
-                        className="flex w-full items-center gap-2 px-3 py-2 text-left text-red-500 hover:bg-red-50"
-                      >
-                        <TrashSimple size={15} /> Xoá
-                      </button>
-                    </div>
-                  )}
+                  {renderEntryMenu(entry)}
                 </div>
               );
             })}
+          </div>
+        ) : (
+          <div className="overflow-x-auto rounded-xl border border-slate-100">
+            {/* No overflow-y clipping here (unlike other admin tables) - the per-row "..." dropdown is absolutely
+                positioned inside its cell and would get cut off by a bottom row's menu otherwise. */}
+            <table className="w-full text-left text-sm">
+              <thead className="rounded-t-xl bg-slate-50 text-xs text-slate-400">
+                <tr>
+                  <th className="w-10 px-3 py-2"></th>
+                  <th className="px-3 py-2 font-medium">Tên</th>
+                  <th className="w-28 px-3 py-2 font-medium">Kích thước</th>
+                  <th className="w-44 px-3 py-2 font-medium">Sửa đổi</th>
+                  <th className="w-10 px-3 py-2"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {visibleEntries.map((entry) => {
+                  const isFolder = entry.type === "folder";
+                  const Icon = isFolder ? FolderSimple : iconForFile(entry.name);
+                  const isSelected = selected.has(entry.path);
+                  const isDragOver = dragOverPath === entry.path;
+                  const isThumb = !isFolder && entry.url && IMAGE_EXT.has(extOf(entry.name));
+
+                  return (
+                    <tr
+                      key={entry.path}
+                      {...entryInteractionProps(entry)}
+                      className={`group cursor-pointer border-t border-slate-100 transition-colors ${
+                        isDragOver ? "bg-sky-50" : isSelected ? "bg-sky-50" : "hover:bg-slate-50"
+                      }`}
+                    >
+                      <td className="px-3 py-2">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => toggleSelect(entry.path, false)}
+                          onClick={(e) => e.stopPropagation()}
+                          className="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-400"
+                        />
+                      </td>
+                      <td className="px-3 py-2">
+                        <div className="flex items-center gap-2">
+                          {isThumb ? (
+                            <img src={entry.url!} alt="" className="h-7 w-7 shrink-0 rounded object-cover" />
+                          ) : (
+                            <Icon size={20} weight="duotone" className={`shrink-0 ${isFolder ? "text-sky-400" : "text-slate-400"}`} />
+                          )}
+                          <span className="truncate font-medium text-slate-700">{entry.name}</span>
+                        </div>
+                      </td>
+                      <td className="px-3 py-2 text-slate-400">{isFolder ? "—" : formatBytes(entry.size)}</td>
+                      <td className="px-3 py-2 text-slate-400">{formatDate(entry.mtime)}</td>
+                      <td className="relative px-3 py-2 text-right">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setMenuFor(menuFor === entry.path ? null : entry.path);
+                          }}
+                          className="rounded p-0.5 text-slate-400 opacity-0 hover:bg-slate-200 group-hover:opacity-100"
+                        >
+                          <DotsThreeVertical size={16} weight="bold" />
+                        </button>
+                        {renderEntryMenu(entry)}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         )}
       </div>
