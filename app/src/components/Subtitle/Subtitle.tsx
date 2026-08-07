@@ -1,5 +1,6 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { useMemo } from "react";
+import { IconCheck } from "@/components/Icon/Icon";
 import type { SubtitleItem, VocabItem } from "@/types";
 
 interface SubtitleProps {
@@ -12,6 +13,10 @@ interface SubtitleProps {
    * plain text (see useVocabulary's vocabForCue). Empty when the cue has no vocab attached. */
   vocabWords?: VocabItem[];
   onWordTap?: (item: VocabItem) => void;
+  /** Whether a vocab word has already been marked "Đã thuộc" - drives the same green
+   * checked look the VocabDeck/VocabFlashcard use, so it's visible right in the dialogue
+   * too instead of only inside those panels. */
+  isKnown?: (vocabId: string) => boolean;
 }
 
 function stripPunctuation(word: string): string {
@@ -28,7 +33,7 @@ function useActiveWordIndex(cue: SubtitleItem | undefined, time: number, wordCou
   }, [cue, time, wordCount]);
 }
 
-export function Subtitle({ enCue, viCue, currentTime, showEn, showVi, vocabWords, onWordTap }: SubtitleProps) {
+export function Subtitle({ enCue, viCue, currentTime, showEn, showVi, vocabWords, onWordTap, isKnown }: SubtitleProps) {
   const enWords = useMemo(() => enCue?.text.split(/\s+/).filter(Boolean) ?? [], [enCue]);
   const activeIndex = useActiveWordIndex(enCue, currentTime, enWords.length);
   const vocabByWord = useMemo(() => {
@@ -56,6 +61,7 @@ export function Subtitle({ enCue, viCue, currentTime, showEn, showVi, vocabWords
                 const vocabItem = vocabByWord.get(stripPunctuation(word));
                 const isActive = i === activeIndex;
                 if (vocabItem && onWordTap) {
+                  const known = isKnown?.(vocabItem.id) ?? false;
                   return (
                     <button
                       key={i}
@@ -64,9 +70,10 @@ export function Subtitle({ enCue, viCue, currentTime, showEn, showVi, vocabWords
                         e.stopPropagation();
                         onWordTap(vocabItem);
                       }}
-                      className="pointer-events-auto mx-1 inline-block rounded-md underline decoration-2 decoration-dotted underline-offset-4 transition-colors duration-150"
-                      style={{ color: isActive ? "#FFD54A" : "#5CC8FF", transform: isActive ? "scale(1.08)" : "scale(1)" }}
+                      className="pointer-events-auto mx-1 inline-flex items-center gap-0.5 rounded-md underline decoration-2 decoration-dotted underline-offset-4 transition-colors duration-150"
+                      style={{ color: isActive ? "#FFD54A" : known ? "#8EE28E" : "#5CC8FF", transform: isActive ? "scale(1.08)" : "scale(1)" }}
                     >
+                      {known && <IconCheck className="h-3 w-3 sm:h-4 sm:w-4" />}
                       {word}
                     </button>
                   );

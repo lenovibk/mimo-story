@@ -556,6 +556,7 @@ export function Player() {
         showVi={subtitleViOn}
         vocabWords={phase === "idle" ? currentVocabWords : undefined}
         onWordTap={handleWordTap}
+        isKnown={(vocabId) => isVocabKnown(activeChildId, vocabId)}
       />
 
       <div
