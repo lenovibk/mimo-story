@@ -2,22 +2,25 @@ import { motion } from "framer-motion";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { CircleButton, SolidPillButton } from "@/components/Button/Button";
-import { IconBack, IconFamily, IconStar } from "@/components/Icon/Icon";
+import { IconBack, IconFamily, IconSettings, IconStar } from "@/components/Icon/Icon";
 import { SkyBackground } from "@/components/SkyBackground/SkyBackground";
+import { useTranslation } from "@/i18n/useTranslation";
+import type { TranslationKey } from "@/i18n/translate";
 import { api } from "@/services/api";
 import { useAuthStore } from "@/store/useAuthStore";
 import type { DashboardStats } from "@/types";
 
 /** Playful level names derived from total stars - purely cosmetic, no real curriculum behind it yet. */
-function learningLevel(stars: number): string {
-  if (stars < 50) return "Chồi non";
-  if (stars < 150) return "Mầm xanh";
-  if (stars < 400) return "Lá biếc";
-  return "Ngôi sao nhỏ";
+function learningLevelKey(stars: number): TranslationKey {
+  if (stars < 50) return "profile.levelChoi";
+  if (stars < 150) return "profile.levelMam";
+  if (stars < 400) return "profile.levelLa";
+  return "profile.levelStar";
 }
 
 export function Profile() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const children = useAuthStore((s) => s.children);
   const activeChildId = useAuthStore((s) => s.activeChildId);
   const setActiveChild = useAuthStore((s) => s.setActiveChild);
@@ -42,15 +45,24 @@ export function Profile() {
       <SkyBackground />
 
       <div className="no-scrollbar relative z-10 h-full overflow-y-auto overscroll-contain">
-        <header className="safe-px safe-pt flex items-center gap-4">
+        <header className="safe-px safe-pt flex items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <CircleButton
+              icon={<IconBack className="h-6 w-6" />}
+              color="white"
+              size={44}
+              ariaLabel={t("profile.backAriaLabel")}
+              onClick={() => navigate("/home")}
+            />
+            <h1 className="font-heading text-xl font-bold text-white drop-shadow-sm">{t("profile.title")}</h1>
+          </div>
           <CircleButton
-            icon={<IconBack className="h-6 w-6" />}
+            icon={<IconSettings className="h-6 w-6" />}
             color="white"
             size={44}
-            ariaLabel="Về trang chủ"
-            onClick={() => navigate("/home")}
+            ariaLabel={t("profile.settingsAriaLabel")}
+            onClick={() => navigate("/settings")}
           />
-          <h1 className="font-heading text-xl font-bold text-white drop-shadow-sm">Hồ sơ của bé</h1>
         </header>
 
         <motion.div
@@ -62,28 +74,30 @@ export function Profile() {
             {child.gender === "boy" ? "👦" : "👧"}
           </span>
           <p className="font-heading text-2xl font-bold text-white drop-shadow-sm">{child.name}</p>
-          <p className="font-body text-white/85">{child.age === 7 ? "7+ tuổi" : `${child.age} tuổi`}</p>
+          <p className="font-body text-white/85">
+            {child.age === 7 ? t("profile.age7Plus") : t("profile.ageSuffix", { age: child.age })}
+          </p>
         </motion.div>
 
         <div className="safe-px mt-8 grid grid-cols-2 gap-3">
-          <StatCard label="Cấp độ học" value={learningLevel(stats?.stars ?? child.stars)} />
+          <StatCard label={t("profile.statLevel")} value={t(learningLevelKey(stats?.stars ?? child.stars))} />
           <StatCard
-            label="Sao đã thu thập"
+            label={t("profile.statStars")}
             value={String(stats?.stars ?? child.stars)}
             icon={<IconStar className="h-5 w-5 text-[#FFD54A]" />}
           />
-          <StatCard label="Chuỗi ngày học" value={`${stats?.streakDays ?? 0} ngày`} />
-          <StatCard label="Từ vựng đã học" value="Đang cập nhật" />
-          <StatCard label="Truyện đã hoàn thành" value={String(stats?.storiesCompleted ?? 0)} />
-          <StatCard label="Truyện yêu thích" value={String(stats?.favoritesCount ?? 0)} />
+          <StatCard label={t("profile.statStreak")} value={t("profile.statStreakDays", { days: stats?.streakDays ?? 0 })} />
+          <StatCard label={t("profile.statVocab")} value={t("profile.statVocabPlaceholder")} />
+          <StatCard label={t("profile.statStoriesCompleted")} value={String(stats?.storiesCompleted ?? 0)} />
+          <StatCard label={t("profile.statFavorites")} value={String(stats?.favoritesCount ?? 0)} />
         </div>
 
         <div className="safe-px mt-6 pb-10">
           <SolidPillButton
             icon={<IconFamily className="h-5 w-5" />}
-            label="Đổi bé / Thoát hồ sơ"
+            label={t("profile.switchChildLabel")}
             color="white"
-            ariaLabel="Đổi sang bé khác"
+            ariaLabel={t("profile.switchChildAriaLabel")}
             onClick={handleSwitchChild}
             className="mx-auto justify-center px-6 py-3 text-slate-500"
           />

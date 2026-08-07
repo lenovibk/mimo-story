@@ -4,11 +4,13 @@ import { useNavigate } from "react-router-dom";
 import { Logo } from "@/components/Logo/Logo";
 import { SkyBackground } from "@/components/SkyBackground/SkyBackground";
 import { useEnsureCatalogLoaded } from "@/hooks/useEnsureCatalogLoaded";
+import { useTranslation } from "@/i18n/useTranslation";
 
 const SPLASH_DURATION_MS = 2000;
 
 export function Splash() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   useEnsureCatalogLoaded();
 
   useEffect(() => {
@@ -33,7 +35,7 @@ export function Splash() {
           <Logo size="lg" />
         </motion.div>
         <p className="font-heading text-lg font-semibold text-white/90 drop-shadow sm:text-xl">
-          Học mà chơi - Chơi mà học!
+          {t("splash.tagline")}
         </p>
       </motion.div>
     </div>

@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
 import { forwardRef } from "react";
 import { AnimatedHeart } from "@/components/Icon/Icon";
+import { useTranslation } from "@/i18n/useTranslation";
 import type { Story } from "@/types";
 import { formatDuration } from "@/utils/time";
 
@@ -27,6 +28,7 @@ export const StoryCard = forwardRef<HTMLButtonElement, StoryCardProps>(function 
   { story, onSelect, isActive = true, progress, size = "default", shape = "portrait", favorite, onToggleFavorite },
   ref
 ) {
+  const { t } = useTranslation();
   const isSquare = shape === "square";
   return (
     <motion.button
@@ -78,7 +80,7 @@ export const StoryCard = forwardRef<HTMLButtonElement, StoryCardProps>(function 
         <motion.span
           role="button"
           tabIndex={0}
-          aria-label={favorite ? "Bỏ yêu thích" : "Thêm vào yêu thích"}
+          aria-label={favorite ? t("common.favoriteRemove") : t("common.favoriteAdd")}
           whileTap={{ scale: 0.85 }}
           onClick={(e) => {
             e.stopPropagation();
@@ -102,7 +104,7 @@ export const StoryCard = forwardRef<HTMLButtonElement, StoryCardProps>(function 
                 isSquare ? "px-2 py-0.5 text-[10px]" : "px-3 py-1 text-xs"
               }`}
             >
-              Mới
+              {t("common.tagNew")}
             </span>
           )}
           {story.tags?.includes("featured") && (
@@ -111,7 +113,7 @@ export const StoryCard = forwardRef<HTMLButtonElement, StoryCardProps>(function 
                 isSquare ? "px-2 py-0.5 text-[10px]" : "px-3 py-1 text-xs"
               }`}
             >
-              Đặc sắc
+              {t("common.tagFeatured")}
             </span>
           )}
         </div>

@@ -8,6 +8,7 @@ import { SkyBackground } from "@/components/SkyBackground/SkyBackground";
 import { getCategoryIcon } from "@/data/categoryVisuals";
 import { getProgramIcon } from "@/data/programVisuals";
 import { useEnsureCatalogLoaded } from "@/hooks/useEnsureCatalogLoaded";
+import { useTranslation } from "@/i18n/useTranslation";
 import { useAppStore } from "@/store/useAppStore";
 import { useAuthStore } from "@/store/useAuthStore";
 import { useCatalogStore } from "@/store/useCatalogStore";
@@ -82,6 +83,7 @@ function CategorySection({
 export function ProgramExplore() {
   const { programId } = useParams<{ programId: string }>();
   const navigate = useNavigate();
+  const { t } = useTranslation();
   useEnsureCatalogLoaded();
 
   const programs = useCatalogStore((s) => s.programs);
@@ -130,7 +132,7 @@ export function ProgramExplore() {
             icon={<IconChevronLeft className="h-6 w-6" />}
             color="white"
             size={48}
-            ariaLabel="Quay lại"
+            ariaLabel={t("programExplore.backAriaLabel")}
             onClick={() => navigate(-1)}
           />
           {program && ProgramIcon && (

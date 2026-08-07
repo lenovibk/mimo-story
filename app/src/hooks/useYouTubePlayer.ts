@@ -6,6 +6,7 @@ type YTPlayerInstance = {
   seekTo: (seconds: number, allowSeekAhead: boolean) => void;
   getCurrentTime: () => number;
   getDuration: () => number;
+  setPlaybackRate: (suggestedRate: number) => void;
   unloadModule: (moduleName: string) => void;
   destroy: () => void;
 };
@@ -59,6 +60,7 @@ export interface YouTubePlayerController {
   play: () => void;
   pause: () => void;
   seekTo: (seconds: number) => void;
+  setPlaybackRate: (rate: number) => void;
 }
 
 interface YouTubePlayerHandlers {
@@ -150,6 +152,7 @@ export function useYouTubePlayer(
         play: () => playerRef.current?.playVideo(),
         pause: () => playerRef.current?.pauseVideo(),
         seekTo: (seconds: number) => playerRef.current?.seekTo(seconds, true),
+        setPlaybackRate: (rate: number) => playerRef.current?.setPlaybackRate(rate),
       }
     : null;
 

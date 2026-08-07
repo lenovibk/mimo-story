@@ -1,4 +1,5 @@
 import { useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { useTranslation } from "@/i18n/useTranslation";
 
 interface ProgressBarProps {
   currentTime: number;
@@ -20,6 +21,7 @@ export function ProgressBar({
   disabled = false,
   className = "",
 }: ProgressBarProps) {
+  const { t } = useTranslation();
   const trackRef = useRef<HTMLDivElement>(null);
   const [dragRatio, setDragRatio] = useState<number | null>(null);
 
@@ -64,7 +66,7 @@ export function ProgressBar({
     <div
       ref={trackRef}
       role="slider"
-      aria-label="Video progress"
+      aria-label={t("common.videoProgressAriaLabel")}
       aria-valuemin={0}
       aria-valuemax={Math.round(duration)}
       aria-valuenow={Math.round(currentTime)}

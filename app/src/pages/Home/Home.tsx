@@ -1,8 +1,7 @@
-import { AnimatePresence, motion } from "framer-motion";
+import { motion } from "framer-motion";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AdBanner } from "@/components/AdBanner/AdBanner";
-import { SolidPillButton } from "@/components/Button/Button";
 import { IconChevronRight, IconFamily, IconFace, IconHeart, IconSettings, IconStar } from "@/components/Icon/Icon";
 import {
   ItemsRail,
@@ -18,6 +17,8 @@ import { StoryCardListRow } from "@/components/StoryCard/StoryCardListRow";
 import { StoryCardWide } from "@/components/StoryCard/StoryCardWide";
 import { getProgramIcon } from "@/data/programVisuals";
 import { useEnsureCatalogLoaded } from "@/hooks/useEnsureCatalogLoaded";
+import { useTranslation } from "@/i18n/useTranslation";
+import type { TranslationKey } from "@/i18n/translate";
 import { useAppStore } from "@/store/useAppStore";
 import { useAuthStore } from "@/store/useAuthStore";
 import { useCatalogStore } from "@/store/useCatalogStore";
@@ -178,6 +179,7 @@ function StoryRail({
  * (see ProgramExplore), so every program card stays a clean title + two-card teaser instead
  * of a cluttered row of filter chips. */
 function ExploreButton({ color, onClick }: { color: string; onClick: () => void }) {
+  const { t } = useTranslation();
   return (
     <motion.button
       type="button"
@@ -193,7 +195,7 @@ function ExploreButton({ color, onClick }: { color: string; onClick: () => void 
         <IconStar className="h-3.5 w-3.5" />
       </span>
       <span className="font-heading text-xs font-bold whitespace-nowrap" style={{ color }}>
-        Khám phá
+        {t("home.exploreLabel")}
       </span>
       <IconChevronRight className="h-3.5 w-3.5" style={{ color }} />
     </motion.button>
@@ -257,21 +259,21 @@ function ProgramRow({
 const EMPTY_PROGRESS: Record<string, { ratio: number; updatedAt: number }> = {};
 const EMPTY_FAVORITES: string[] = [];
 
-function timeOfDayGreeting(): string {
+function timeOfDayGreetingKey(): TranslationKey {
   const hour = new Date().getHours();
-  if (hour < 11) return "Chào buổi sáng";
-  if (hour < 14) return "Chào buổi trưa";
-  if (hour < 18) return "Chào buổi chiều";
-  return "Chào buổi tối";
+  if (hour < 11) return "home.timeMorning";
+  if (hour < 14) return "home.timeNoon";
+  if (hour < 18) return "home.timeAfternoon";
+  return "home.timeEvening";
 }
 
-const GREETINGS = [
-  { text: "Hôm nay mình khám phá gì nào?", emoji: "🚀", accent: "#5CC8FF" },
-  { text: "Bạn Mimo đang chờ mình đó!", emoji: "🦊", accent: "#FFB25C" },
-  { text: "Sẵn sàng phiêu lưu chưa nào?", emoji: "🌈", accent: "#B79CFF" },
-  { text: "Cùng học tiếng Anh thật vui nhé!", emoji: "🎈", accent: "#FF92C2" },
-  { text: "Hôm nay là một ngày siêu tuyệt vời!", emoji: "✨", accent: "#FFD54A" },
-  { text: "Xem truyện gì trước nhỉ?", emoji: "🍿", accent: "#8EE28E" },
+const GREETINGS: { key: TranslationKey; emoji: string; accent: string }[] = [
+  { key: "home.greeting1", emoji: "🚀", accent: "#5CC8FF" },
+  { key: "home.greeting2", emoji: "🦊", accent: "#FFB25C" },
+  { key: "home.greeting3", emoji: "🌈", accent: "#B79CFF" },
+  { key: "home.greeting4", emoji: "🎈", accent: "#FF92C2" },
+  { key: "home.greeting5", emoji: "✨", accent: "#FFD54A" },
+  { key: "home.greeting6", emoji: "🍿", accent: "#8EE28E" },
 ];
 
 const GREETING_SPARKLES = [
@@ -284,6 +286,7 @@ const GREETING_SPARKLES = [
 
 /** A big, colorful, tappable mascot card that greets the active child by name. */
 function HomeGreeting({ name, gender }: { name: string; gender: "boy" | "girl" }) {
+  const { t } = useTranslation();
   const greeting = useMemo(() => GREETINGS[Math.floor(Math.random() * GREETINGS.length)], [name]);
   const [bump, setBump] = useState(0);
 
@@ -319,7 +322,7 @@ function HomeGreeting({ name, gender }: { name: string; gender: "boy" | "girl" }
         <motion.button
           type="button"
           onClick={handleBoop}
-          aria-label={`Chào ${name}`}
+          aria-label={t("home.greetingAriaLabel", { name })}
           animate={{ rotate: [0, -14, 12, -10, 8, 0], y: [0, -4, 0] }}
           transition={{ duration: 2.2, repeat: Infinity, repeatDelay: 1.4, ease: "easeInOut" }}
           whileTap={{ scale: 0.82 }}
@@ -342,7 +345,7 @@ function HomeGreeting({ name, gender }: { name: string; gender: "boy" | "girl" }
             transition={{ delay: 0.25, ease: "easeOut" }}
             className="truncate font-heading text-lg font-extrabold text-white drop-shadow-sm sm:text-2xl"
           >
-            {timeOfDayGreeting()}, {name}! 👋
+            {t(timeOfDayGreetingKey())}, {name}! 👋
           </motion.p>
           <motion.p
             initial={{ opacity: 0, x: -10 }}
@@ -350,7 +353,7 @@ function HomeGreeting({ name, gender }: { name: string; gender: "boy" | "girl" }
             transition={{ delay: 0.38, ease: "easeOut" }}
             className="truncate font-body text-xs font-semibold text-white/95 sm:text-base"
           >
-            {greeting.text} {greeting.emoji}
+            {t(greeting.key)} {greeting.emoji}
           </motion.p>
         </div>
       </div>
@@ -360,17 +363,16 @@ function HomeGreeting({ name, gender }: { name: string; gender: "boy" | "girl" }
 
 export function Home() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   useEnsureCatalogLoaded();
   const stories = useCatalogStore((s) => s.stories);
   const programs = useCatalogStore((s) => s.programs);
   const activeChildId = useAuthStore((s) => s.activeChildId)!;
   const child = useAuthStore((s) => s.children.find((c) => c.id === activeChildId));
-  const stars = useAppStore((s) => s.starsByChild[activeChildId] ?? 0);
   const storyProgress = useAppStore((s) => s.storyProgressByChild[activeChildId] ?? EMPTY_PROGRESS);
   const favoriteIds = useFavoritesStore((s) => s.favoritesByChild[activeChildId] ?? EMPTY_FAVORITES);
   const loadFavorites = useFavoritesStore((s) => s.loadFavorites);
   const toggleFavorite = useFavoritesStore((s) => s.toggleFavorite);
-  const [settingsOpen, setSettingsOpen] = useState(false);
 
   useEffect(() => {
     loadFavorites(activeChildId).catch(() => {});
@@ -424,7 +426,7 @@ export function Home() {
   const utilityRails = [
     {
       key: "recommended",
-      title: "Được đề xuất cho bạn",
+      title: t("home.railRecommended"),
       emoji: "✨",
       accent: "#B79CFF",
       items: recommendedStories,
@@ -434,7 +436,7 @@ export function Home() {
     },
     {
       key: "favorites",
-      title: "Yêu thích ❤️",
+      title: t("home.railFavorites"),
       emoji: "❤️",
       accent: "#FF7A7A",
       items: favoriteStories,
@@ -450,7 +452,7 @@ export function Home() {
     },
     {
       key: "recent",
-      title: "Xem gần đây",
+      title: t("home.railRecent"),
       emoji: "🕒",
       accent: "#6FE0C8",
       items: recentlyWatchedStories,
@@ -466,7 +468,7 @@ export function Home() {
     },
     {
       key: "new",
-      title: "Mới",
+      title: t("home.railNew"),
       emoji: "🌸",
       accent: "#FF92C2",
       items: newStories,
@@ -489,21 +491,21 @@ export function Home() {
           <div className="flex items-start gap-3 sm:gap-4">
             <HeaderMenuButton
               icon={<IconSettings className="h-6 w-6" />}
-              label="Cài đặt"
+              label={t("home.settingsLabel")}
               color="#B79CFF"
               bobDelay={0}
-              onClick={() => setSettingsOpen(true)}
+              onClick={() => navigate("/settings")}
             />
             <HeaderMenuButton
               icon={<IconFace className="h-6 w-6" />}
-              label="Hồ sơ"
+              label={t("home.profileLabel")}
               color="#FF92C2"
               bobDelay={0.4}
               onClick={() => navigate("/profile")}
             />
             <HeaderMenuButton
               icon={<IconFamily className="h-6 w-6" />}
-              label="Phụ huynh"
+              label={t("home.parentLabel")}
               color="#5CC8FF"
               bobDelay={0.8}
               onClick={() => navigate("/dashboard")}
@@ -559,46 +561,11 @@ export function Home() {
           >
             <p className="mx-auto inline-flex items-center gap-2 rounded-full bg-white/85 px-6 py-2 font-heading text-sm font-semibold text-slate-600 shadow-md">
               <IconStar className="h-4 w-4 text-[#FFD54A]" />
-              Học mà chơi - Chơi mà học - Bé vui mỗi ngày!
+              {t("home.footerTagline")}
               <IconHeart className="h-4 w-4 text-[#FF92C2]" />
             </p>
           </motion.footer>
         </div>
-
-        <AnimatePresence>
-          {settingsOpen && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="absolute inset-0 z-30 flex items-center justify-center bg-black/40 px-6"
-              onClick={() => setSettingsOpen(false)}
-            >
-              <motion.div
-                initial={{ scale: 0.7, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0.7, opacity: 0 }}
-                transition={{ type: "spring", stiffness: 280, damping: 20 }}
-                onClick={(e) => e.stopPropagation()}
-                className="flex w-full max-w-sm flex-col items-center gap-5 rounded-[28px] bg-white p-8 text-center shadow-2xl"
-              >
-                <Logo />
-                <p className="font-body text-slate-500">MimoKids - phiên bản 1.0</p>
-                <p className="flex items-center gap-2 font-heading text-lg font-bold text-slate-700">
-                  <IconStar className="h-5 w-5 text-[#FFD54A]" />
-                  {stars} sao đã thu thập
-                </p>
-                <SolidPillButton
-                  label="Đóng"
-                  color="primary"
-                  ariaLabel="Close settings"
-                  onClick={() => setSettingsOpen(false)}
-                  className="px-8 py-3 text-lg"
-                />
-              </motion.div>
-            </motion.div>
-          )}
-        </AnimatePresence>
       </div>
     </div>
   );

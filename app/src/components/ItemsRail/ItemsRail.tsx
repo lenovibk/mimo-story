@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { CircleButton } from "@/components/Button/Button";
 import { IconChevronLeft, IconChevronRight } from "@/components/Icon/Icon";
 import { StoryCard } from "@/components/StoryCard/StoryCard";
+import { useTranslation } from "@/i18n/useTranslation";
 import type { Story } from "@/types";
 import { playTick, playWhoosh } from "@/utils/sound";
 
@@ -79,6 +80,7 @@ export function ItemsRail({
    * still read as visually distinct "kinds" of shelf instead of every rail looking identical. */
   renderItem?: (story: Story, isActive: boolean) => React.ReactNode;
 }) {
+  const { t } = useTranslation();
   const cardRefs = useRef(new Map<string, HTMLDivElement>());
   const [activeId, setActiveId] = useState(items[0]?.id);
   const [isDragging, setIsDragging] = useState(false);
@@ -198,7 +200,7 @@ export function ItemsRail({
             icon={<IconChevronLeft className="h-7 w-7" />}
             color="white"
             size={56}
-            ariaLabel="Trước"
+            ariaLabel={t("common.prev")}
             onClick={() => goTo(-1)}
             disabled={edge.atStart}
             className="pointer-events-auto absolute top-1/2 left-1 -translate-y-1/2"
@@ -207,7 +209,7 @@ export function ItemsRail({
             icon={<IconChevronRight className="h-7 w-7" />}
             color="white"
             size={56}
-            ariaLabel="Tiếp theo"
+            ariaLabel={t("common.next")}
             onClick={() => goTo(1)}
             disabled={edge.atEnd}
             className="pointer-events-auto absolute top-1/2 right-1 -translate-y-1/2"

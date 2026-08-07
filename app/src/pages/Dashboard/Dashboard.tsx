@@ -4,22 +4,33 @@ import { useNavigate } from "react-router-dom";
 import { CircleButton, SolidPillButton } from "@/components/Button/Button";
 import { IconBack } from "@/components/Icon/Icon";
 import { SkyBackground } from "@/components/SkyBackground/SkyBackground";
+import { useTranslation } from "@/i18n/useTranslation";
+import type { TranslationKey } from "@/i18n/translate";
 import { api } from "@/services/api";
 import { useAppStore } from "@/store/useAppStore";
 import { useAuthStore } from "@/store/useAuthStore";
 import type { DashboardStats } from "@/types";
 import { formatDuration } from "@/utils/time";
 
-const PLANS = [
-  { id: "free", label: "Miễn phí" },
-  { id: "premium", label: "Premium" },
-  { id: "family", label: "Gia đình" },
-] as const;
+const PLANS: { id: string; labelKey: TranslationKey }[] = [
+  { id: "free", labelKey: "dashboard.planFree" },
+  { id: "premium", labelKey: "dashboard.planPremium" },
+  { id: "family", labelKey: "dashboard.planFamily" },
+];
 
-const WEEKDAY_LABELS = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
+const WEEKDAY_KEYS: TranslationKey[] = [
+  "dashboard.weekdaySun",
+  "dashboard.weekdayMon",
+  "dashboard.weekdayTue",
+  "dashboard.weekdayWed",
+  "dashboard.weekdayThu",
+  "dashboard.weekdayFri",
+  "dashboard.weekdaySat",
+];
 
 export function Dashboard() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const parent = useAuthStore((s) => s.parent);
   const children = useAuthStore((s) => s.children);
   const activeChildId = useAuthStore((s) => s.activeChildId);
@@ -62,10 +73,10 @@ export function Dashboard() {
             icon={<IconBack className="h-6 w-6" />}
             color="white"
             size={44}
-            ariaLabel="Về trang chủ"
+            ariaLabel={t("dashboard.backAriaLabel")}
             onClick={() => navigate("/home")}
           />
-          <h1 className="font-heading text-xl font-bold text-white drop-shadow-sm">Bảng điều khiển phụ huynh</h1>
+          <h1 className="font-heading text-xl font-bold text-white drop-shadow-sm">{t("dashboard.title")}</h1>
         </header>
 
         <div className="safe-px mt-4 flex gap-2 overflow-x-auto pb-1">
@@ -88,31 +99,31 @@ export function Dashboard() {
           animate={{ opacity: 1, y: 0 }}
           className="safe-px mt-6 grid grid-cols-2 gap-3"
         >
-          <StatCard label="Tổng thời gian học" value={formatDuration(stats?.totalLearningSeconds ?? 0)} />
-          <StatCard label="Truyện hoàn thành" value={String(stats?.storiesCompleted ?? 0)} />
+          <StatCard label={t("dashboard.statTotalTime")} value={formatDuration(stats?.totalLearningSeconds ?? 0)} />
+          <StatCard label={t("dashboard.statStoriesCompleted")} value={String(stats?.storiesCompleted ?? 0)} />
           <StatCard
-            label="Lượt luyện nói"
+            label={t("dashboard.statSpeakingAttempts")}
             value={String((selectedChildId && speakingAttemptsByChild[selectedChildId]) ?? 0)}
           />
-          <StatCard label="Truyện yêu thích" value={String(stats?.favoritesCount ?? 0)} />
-          <StatCard label="Chuỗi ngày học" value={`${stats?.streakDays ?? 0} ngày`} />
-          <StatCard label="Sao đã thu thập" value={String(stats?.stars ?? 0)} />
+          <StatCard label={t("dashboard.statFavorites")} value={String(stats?.favoritesCount ?? 0)} />
+          <StatCard label={t("dashboard.statStreak")} value={t("dashboard.statStreakDays", { days: stats?.streakDays ?? 0 })} />
+          <StatCard label={t("dashboard.statStars")} value={String(stats?.stars ?? 0)} />
         </motion.div>
 
         <div className="safe-px mt-6">
-          <p className="mb-2 font-heading text-sm font-bold text-white drop-shadow-sm">Hoạt động trong tuần</p>
+          <p className="mb-2 font-heading text-sm font-bold text-white drop-shadow-sm">{t("dashboard.weeklyActivityTitle")}</p>
           <div className="flex items-end gap-2 rounded-3xl bg-white/90 p-4 shadow-md">
             {(stats?.weeklyActivity ?? []).map((day) => {
               const minutes = Math.round(day.watchedSeconds / 60);
               const heightPct = Math.min(100, (day.watchedSeconds / 1800) * 100);
-              const weekday = WEEKDAY_LABELS[new Date(day.date).getUTCDay()];
+              const weekday = t(WEEKDAY_KEYS[new Date(day.date).getUTCDay()]);
               return (
                 <div key={day.date} className="flex flex-1 flex-col items-center gap-1">
                   <div className="flex h-20 w-full items-end overflow-hidden rounded-lg bg-slate-100">
                     <div
                       className="w-full rounded-lg bg-[#5CC8FF]"
                       style={{ height: `${Math.max(4, heightPct)}%` }}
-                      title={`${minutes} phút`}
+                      title={t("dashboard.minutesTitle", { minutes })}
                     />
                   </div>
                   <span className="font-body text-[10px] font-semibold text-slate-400">{weekday}</span>
@@ -123,29 +134,30 @@ export function Dashboard() {
         </div>
 
         <div className="safe-px mt-6">
-          <p className="mb-2 font-heading text-sm font-bold text-white drop-shadow-sm">Gói đăng ký</p>
+          <p className="mb-2 font-heading text-sm font-bold text-white drop-shadow-sm">{t("dashboard.subscriptionTitle")}</p>
           <div className="flex flex-col gap-2 rounded-3xl bg-white/90 p-4 shadow-md">
             <p className="font-body text-xs text-slate-400">
-              Đang dùng: <span className="font-bold text-slate-600">{PLANS.find((p) => p.id === plan)?.label}</span>
+              {t("dashboard.currentPlanLabel")}{" "}
+              <span className="font-bold text-slate-600">
+                {t(PLANS.find((p) => p.id === plan)?.labelKey ?? "dashboard.planFree")}
+              </span>
               {" · "}
-              {parent?.isGuest ? "Chưa xác thực email" : parent?.email}
+              {parent?.isGuest ? t("dashboard.emailNotVerified") : parent?.email}
             </p>
             <div className="flex gap-2">
               {PLANS.map((p) => (
                 <SolidPillButton
                   key={p.id}
-                  label={p.label}
+                  label={t(p.labelKey)}
                   color={plan === p.id ? "primary" : "white"}
-                  ariaLabel={`Chọn gói ${p.label}`}
+                  ariaLabel={t("dashboard.selectPlanAriaLabel", { plan: t(p.labelKey) })}
                   disabled={savingPlan}
                   onClick={() => handleSelectPlan(p.id)}
                   className={`flex-1 justify-center py-2.5 text-sm ${plan !== p.id ? "text-slate-500" : ""}`}
                 />
               ))}
             </div>
-            <p className="font-body text-[11px] text-slate-400">
-              * Thanh toán mẫu (mock) - chưa kết nối cổng thanh toán thật.
-            </p>
+            <p className="font-body text-[11px] text-slate-400">{t("dashboard.mockPaymentNote")}</p>
           </div>
         </div>
       </div>

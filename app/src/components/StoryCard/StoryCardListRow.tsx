@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
 import { AnimatedHeart } from "@/components/Icon/Icon";
+import { useTranslation } from "@/i18n/useTranslation";
 import type { Story } from "@/types";
 import { formatDuration } from "@/utils/time";
 
@@ -17,6 +18,7 @@ interface StoryCardListRowProps {
  * the right - used for the Recently Watched shelf so it reads like a watch-history list
  * rather than another rail of big cover cards. */
 export function StoryCardListRow({ story, onSelect, progress, favorite, onToggleFavorite }: StoryCardListRowProps) {
+  const { t } = useTranslation();
   return (
     <motion.button
       type="button"
@@ -61,7 +63,7 @@ export function StoryCardListRow({ story, onSelect, progress, favorite, onToggle
         <motion.span
           role="button"
           tabIndex={0}
-          aria-label={favorite ? "Bỏ yêu thích" : "Thêm vào yêu thích"}
+          aria-label={favorite ? t("common.favoriteRemove") : t("common.favoriteAdd")}
           whileTap={{ scale: 0.85 }}
           onClick={(e) => {
             e.stopPropagation();

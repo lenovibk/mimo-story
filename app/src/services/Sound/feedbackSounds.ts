@@ -3,6 +3,15 @@ import { getSharedAudioContext, primeSharedAudioContext } from "./audioContext";
 /** Unlocks audio for the whole practice flow - call from a button tap. */
 export const primeAudio = primeSharedAudioContext;
 
+/** Module-level sound-effects preference, set from the active child's settings (see
+ * Settings.tsx / useSettingsStore) - Player.tsx keeps this in sync on mount and whenever
+ * the setting changes, so these play* calls don't need a settings param threaded through. */
+let soundConfig = { enabled: true, volume: 1 };
+
+export function configureFeedbackSounds(config: { enabled: boolean; volume: number }): void {
+  soundConfig = config;
+}
+
 function ensureRunning(audioCtx: AudioContext): void {
   if (audioCtx.state === "suspended") void audioCtx.resume();
 }
@@ -30,6 +39,7 @@ function playTone(
 
 /** Short bell "ting" cue played once the mic starts listening. */
 export function playReadyChime(): void {
+  if (!soundConfig.enabled) return;
   try {
     const audioCtx = getSharedAudioContext();
     if (!audioCtx) return;
@@ -44,7 +54,7 @@ export function playReadyChime(): void {
     osc.frequency.exponentialRampToValueAtTime(1760, now + 0.09); // bright upward slide to A6
 
     gain.gain.setValueAtTime(0, now);
-    gain.gain.linearRampToValueAtTime(0.28, now + 0.015);
+    gain.gain.linearRampToValueAtTime(0.28 * soundConfig.volume, now + 0.015);
     gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.45);
 
     osc.connect(gain);
@@ -58,6 +68,7 @@ export function playReadyChime(): void {
 
 /** Cheerful clap-like bursts + a rising fanfare, played when the child passes. */
 export function playSuccessCheer(): void {
+  if (!soundConfig.enabled) return;
   try {
     const audioCtx = getSharedAudioContext();
     if (!audioCtx) return;
@@ -84,7 +95,7 @@ export function playSuccessCheer(): void {
       filter.Q.value = 0.8;
       const gain = audioCtx.createGain();
       const start = now + offset;
-      gain.gain.setValueAtTime(0.5, start);
+      gain.gain.setValueAtTime(0.5 * soundConfig.volume, start);
       gain.gain.exponentialRampToValueAtTime(0.001, start + duration);
 
       noise.connect(filter);
@@ -97,7 +108,7 @@ export function playSuccessCheer(): void {
     // Rising major arpeggio on top - reads as "ta-da!".
     const notes = [523.25, 659.25, 783.99, 1046.5]; // C5 E5 G5 C6
     notes.forEach((freq, i) => {
-      playTone(audioCtx, now + 0.15 + i * 0.09, freq, 0.35, 0.22, "triangle");
+      playTone(audioCtx, now + 0.15 + i * 0.09, freq, 0.35, 0.22 * soundConfig.volume, "triangle");
     });
   } catch {
     // Web Audio unavailable - the cheer just won't play.
@@ -106,6 +117,7 @@ export function playSuccessCheer(): void {
 
 /** Gentle two-note dip played when the child's attempt doesn't pass. */
 export function playTryAgainCue(): void {
+  if (!soundConfig.enabled) return;
   try {
     const audioCtx = getSharedAudioContext();
     if (!audioCtx) return;
@@ -114,7 +126,7 @@ export function playTryAgainCue(): void {
     const now = audioCtx.currentTime;
     const notes = [440, 349.23]; // A4 -> F4, soft descending "aw"
     notes.forEach((freq, i) => {
-      playTone(audioCtx, now + i * 0.16, freq, 0.3, 0.2, "sine");
+      playTone(audioCtx, now + i * 0.16, freq, 0.3, 0.2 * soundConfig.volume, "sine");
     });
   } catch {
     // Web Audio unavailable - the cue just won't play.

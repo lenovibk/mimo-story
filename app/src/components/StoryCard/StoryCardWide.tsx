@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
 import { AnimatedHeart } from "@/components/Icon/Icon";
+import { useTranslation } from "@/i18n/useTranslation";
 import type { Story } from "@/types";
 import { formatDuration } from "@/utils/time";
 
@@ -16,6 +17,7 @@ interface StoryCardWideProps {
  * used for the Recommended shelf so a suggestion visually reads as a different kind of item
  * than a regular lesson card, more like a featured pick than a rail of interchangeable covers. */
 export function StoryCardWide({ story, onSelect, favorite, onToggleFavorite }: StoryCardWideProps) {
+  const { t } = useTranslation();
   return (
     <motion.button
       type="button"
@@ -41,7 +43,7 @@ export function StoryCardWide({ story, onSelect, favorite, onToggleFavorite }: S
           <motion.span
             role="button"
             tabIndex={0}
-            aria-label={favorite ? "Bỏ yêu thích" : "Thêm vào yêu thích"}
+            aria-label={favorite ? t("common.favoriteRemove") : t("common.favoriteAdd")}
             whileTap={{ scale: 0.85 }}
             onClick={(e) => {
               e.stopPropagation();
@@ -57,12 +59,12 @@ export function StoryCardWide({ story, onSelect, favorite, onToggleFavorite }: S
           <div className="absolute top-2 right-2 flex flex-col items-end gap-1">
             {story.tags?.includes("new") && (
               <span className="rounded-full bg-[#FF92C2] px-2.5 py-0.5 font-heading text-[10px] font-bold text-white shadow-md">
-                Mới
+                {t("common.tagNew")}
               </span>
             )}
             {story.tags?.includes("featured") && (
               <span className="rounded-full bg-[#FFD54A] px-2.5 py-0.5 font-heading text-[10px] font-bold text-white shadow-md">
-                Đặc sắc
+                {t("common.tagFeatured")}
               </span>
             )}
           </div>

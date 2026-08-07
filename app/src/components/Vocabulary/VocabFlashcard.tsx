@@ -1,14 +1,16 @@
 import { motion } from "framer-motion";
 import { SolidPillButton } from "@/components/Button/Button";
 import { IconCheck, IconStar, IconX } from "@/components/Icon/Icon";
+import { useTranslation } from "@/i18n/useTranslation";
+import type { TranslationKey } from "@/i18n/translate";
 import type { VocabItem } from "@/types";
 
-const PART_OF_SPEECH_LABEL: Record<string, string> = {
-  noun: "danh từ",
-  verb: "động từ",
-  adjective: "tính từ",
-  adverb: "trạng từ",
-  phrase: "cụm từ",
+const PART_OF_SPEECH_KEYS: Record<string, TranslationKey> = {
+  noun: "vocab.posNoun",
+  verb: "vocab.posVerb",
+  adjective: "vocab.posAdjective",
+  adverb: "vocab.posAdverb",
+  phrase: "vocab.posPhrase",
 };
 
 interface VocabFlashcardProps {
@@ -21,6 +23,7 @@ interface VocabFlashcardProps {
 /** Tap-to-check flashcard for one vocab word - meaning + example, self-marked "Đã thuộc"
  * (no auto-graded quiz, per the flashcard-style check the lesson panel uses). */
 export function VocabFlashcard({ item, known, onClose, onToggleKnown }: VocabFlashcardProps) {
+  const { t } = useTranslation();
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -40,7 +43,7 @@ export function VocabFlashcard({ item, known, onClose, onToggleKnown }: VocabFla
         <button
           type="button"
           onClick={onClose}
-          aria-label="Đóng"
+          aria-label={t("vocab.closeAriaLabel")}
           className="absolute top-4 right-4 text-slate-300 hover:text-slate-500"
         >
           <IconX className="h-5 w-5" />
@@ -56,7 +59,7 @@ export function VocabFlashcard({ item, known, onClose, onToggleKnown }: VocabFla
             {item.phonetic && <span className="font-heading">{item.phonetic}</span>}
             {item.partOfSpeech && (
               <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold">
-                {PART_OF_SPEECH_LABEL[item.partOfSpeech] ?? item.partOfSpeech}
+                {item.partOfSpeech in PART_OF_SPEECH_KEYS ? t(PART_OF_SPEECH_KEYS[item.partOfSpeech]) : item.partOfSpeech}
               </span>
             )}
           </div>
@@ -84,15 +87,21 @@ export function VocabFlashcard({ item, known, onClose, onToggleKnown }: VocabFla
           >
             {known && <IconCheck className="h-4 w-4" />}
           </span>
-          {known ? "Đã thuộc!" : "Đánh dấu đã thuộc"}
+          {known ? t("vocab.markedKnown") : t("vocab.markKnown")}
         </button>
         {known && (
           <p className="flex items-center gap-1 font-heading text-sm font-bold text-[#FFD54A]">
-            +5 <IconStar className="h-4 w-4" /> Stars
+            {t("vocab.starsEarned")} <IconStar className="h-4 w-4" />
           </p>
         )}
 
-        <SolidPillButton label="Đóng" color="primary" ariaLabel="Đóng thẻ từ vựng" onClick={onClose} className="mt-1 px-8 py-3" />
+        <SolidPillButton
+          label={t("vocab.closeLabel")}
+          color="primary"
+          ariaLabel={t("vocab.closeCardAriaLabel")}
+          onClick={onClose}
+          className="mt-1 px-8 py-3"
+        />
       </motion.div>
     </motion.div>
   );

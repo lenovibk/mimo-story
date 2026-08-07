@@ -5,12 +5,17 @@ import { SolidPillButton } from "@/components/Button/Button";
 import { Logo } from "@/components/Logo/Logo";
 import { SkyBackground } from "@/components/SkyBackground/SkyBackground";
 import { useEnsureGuestSession } from "@/hooks/useEnsureGuestSession";
+import { useTranslation } from "@/i18n/useTranslation";
+import type { TranslationKey } from "@/i18n/translate";
 import { ApiError, api } from "@/services/api";
 import { useAuthStore } from "@/store/useAuthStore";
 
 type Step = "email" | "code";
 
-const PLAN_LABELS: Record<string, string> = { premium: "Premium", family: "Gia đình" };
+const PLAN_LABEL_KEYS: Record<string, TranslationKey> = {
+  premium: "upgrade.planPremium",
+  family: "upgrade.planFamily",
+};
 
 /**
  * Email is never required just to use the app (see RequireChild's guest
@@ -20,8 +25,10 @@ const PLAN_LABELS: Record<string, string> = { premium: "Premium", family: "Gia �
  */
 export function Upgrade() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const location = useLocation();
   const pendingPlan = (location.state as { plan?: string } | null)?.plan;
+  const pendingPlanLabel = pendingPlan ? (PLAN_LABEL_KEYS[pendingPlan] ? t(PLAN_LABEL_KEYS[pendingPlan]) : pendingPlan) : undefined;
   useEnsureGuestSession();
   const login = useAuthStore((s) => s.login);
 
@@ -39,7 +46,7 @@ export function Upgrade() {
       await api.requestCode(email.trim());
       setStep("code");
     } catch {
-      setError("Không gửi được email. Vui lòng kiểm tra lại địa chỉ email.");
+      setError(t("upgrade.emailErrorGeneric"));
     } finally {
       setLoading(false);
     }
@@ -56,11 +63,11 @@ export function Upgrade() {
       navigate("/dashboard", { replace: true });
     } catch (err) {
       if (err instanceof ApiError && err.code === "email_in_use") {
-        setError("Email này đã được dùng cho một tài khoản khác.");
+        setError(t("upgrade.emailInUse"));
       } else if (err instanceof ApiError && err.code === "invalid_or_expired_code") {
-        setError("Mã xác thực không đúng hoặc đã hết hạn.");
+        setError(t("upgrade.codeInvalid"));
       } else {
-        setError("Có lỗi xảy ra, vui lòng thử lại.");
+        setError(t("upgrade.genericError"));
       }
     } finally {
       setLoading(false);
@@ -88,25 +95,23 @@ export function Upgrade() {
             className="flex w-full flex-col gap-4"
           >
             <p className="font-heading text-lg font-bold text-slate-700">
-              Xác thực email {pendingPlan ? `để dùng gói ${PLAN_LABELS[pendingPlan] ?? pendingPlan}` : ""}
+              {t("upgrade.verifyEmailTitle")} {pendingPlan ? t("upgrade.verifyEmailForPlan", { plan: pendingPlanLabel ?? pendingPlan }) : ""}
             </p>
-            <p className="font-body text-sm text-slate-500">
-              Chỉ cần cho gói trả phí - dùng app miễn phí thì không cần bước này.
-            </p>
+            <p className="font-body text-sm text-slate-500">{t("upgrade.verifyEmailHint")}</p>
             <input
               type="email"
               required
               autoFocus
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="email@example.com"
+              placeholder={t("upgrade.emailPlaceholder")}
               className="w-full rounded-2xl border-2 border-slate-200 px-4 py-3 text-center font-body text-base text-slate-700 outline-none focus:border-[#5CC8FF]"
             />
             {error && <p className="font-body text-sm text-[#FF7A7A]">{error}</p>}
             <SolidPillButton
-              label={loading ? "Đang gửi..." : "Gửi mã xác thực"}
+              label={loading ? t("upgrade.sending") : t("upgrade.sendCodeLabel")}
               color="primary"
-              ariaLabel="Gửi mã xác thực"
+              ariaLabel={t("upgrade.sendCodeLabel")}
               disabled={loading}
               onClick={() => void submitEmail()}
               className="w-full justify-center py-3.5 text-lg"
@@ -116,7 +121,7 @@ export function Upgrade() {
               onClick={() => navigate(-1)}
               className="font-body text-sm text-slate-400 underline"
             >
-              Quay lại
+              {t("upgrade.backLabel")}
             </button>
           </form>
         ) : (
@@ -127,8 +132,8 @@ export function Upgrade() {
             }}
             className="flex w-full flex-col gap-4"
           >
-            <p className="font-heading text-lg font-bold text-slate-700">Nhập mã xác thực</p>
-            <p className="font-body text-sm text-slate-500">Mã 6 số vừa gửi tới {email}</p>
+            <p className="font-heading text-lg font-bold text-slate-700">{t("upgrade.enterCodeTitle")}</p>
+            <p className="font-body text-sm text-slate-500">{t("upgrade.codeSentHint", { email })}</p>
             <input
               type="text"
               inputMode="numeric"
@@ -143,9 +148,9 @@ export function Upgrade() {
             />
             {error && <p className="font-body text-sm text-[#FF7A7A]">{error}</p>}
             <SolidPillButton
-              label={loading ? "Đang xác thực..." : "Xác nhận"}
+              label={loading ? t("upgrade.verifying") : t("upgrade.confirmLabel")}
               color="primary"
-              ariaLabel="Xác nhận mã"
+              ariaLabel={t("upgrade.confirmLabel")}
               disabled={loading || code.length !== 6}
               onClick={() => void submitCode()}
               className="w-full justify-center py-3.5 text-lg"
@@ -155,7 +160,7 @@ export function Upgrade() {
               onClick={() => setStep("email")}
               className="font-body text-sm text-slate-400 underline"
             >
-              Đổi email khác
+              {t("upgrade.changeEmailLabel")}
             </button>
           </form>
         )}

@@ -17,9 +17,11 @@ import { useEnsureCatalogLoaded } from "@/hooks/useEnsureCatalogLoaded";
 import { findActiveCue, findNearestCue, useSubtitles } from "@/hooks/useSubtitles";
 import { useVocabulary, vocabForCue } from "@/hooks/useVocabulary";
 import { useYouTubePlayer } from "@/hooks/useYouTubePlayer";
+import { useTranslation } from "@/i18n/useTranslation";
 import { api } from "@/services/api";
 import { getAudioRecorder } from "@/services/Recording";
 import {
+  configureFeedbackSounds,
   playReadyChime,
   playSuccessCheer,
   playTryAgainCue,
@@ -30,6 +32,7 @@ import { useAppStore } from "@/store/useAppStore";
 import { useAuthStore } from "@/store/useAuthStore";
 import { useCatalogStore } from "@/store/useCatalogStore";
 import { useFavoritesStore } from "@/store/useFavoritesStore";
+import { useSettingsStore } from "@/store/useSettingsStore";
 import { useVocabProgressStore } from "@/store/useVocabProgressStore";
 import type { PronunciationResult, VocabItem } from "@/types";
 import { formatDuration } from "@/utils/time";
@@ -88,22 +91,43 @@ export function Player() {
   const [showEndDialog, setShowEndDialog] = useState(false);
   const [tappedVocab, setTappedVocab] = useState<VocabItem | null>(null);
   const [vocabDeckOpen, setVocabDeckOpen] = useState(false);
+  const [dailyLimitReached, setDailyLimitReached] = useState(false);
 
-  const subtitleEnOn = useAppStore((s) => s.subtitleEnOn);
-  const subtitleViOn = useAppStore((s) => s.subtitleViOn);
+  const { t } = useTranslation();
   const shadowingOn = useAppStore((s) => s.shadowingOn);
-  const autoPlayNext = useAppStore((s) => s.autoPlayNext);
-  const toggleSubtitleEn = useAppStore((s) => s.toggleSubtitleEn);
-  const toggleSubtitleVi = useAppStore((s) => s.toggleSubtitleVi);
   const toggleShadowing = useAppStore((s) => s.toggleShadowing);
-  const toggleAutoPlayNext = useAppStore((s) => s.toggleAutoPlayNext);
   const addStars = useAppStore((s) => s.addStars);
   const setStoryProgress = useAppStore((s) => s.setStoryProgress);
   const incrementSpeakingAttempts = useAppStore((s) => s.incrementSpeakingAttempts);
   const activeChildId = useAuthStore((s) => s.activeChildId)!;
+
+  // Subtitle display, autoplay-next, playback speed, sound and the daily time limit are all
+  // per-child preferences - see Settings.tsx / useSettingsStore.
+  const settings = useSettingsStore((s) => s.getSettings(activeChildId));
+  const updateChildSettings = useSettingsStore((s) => s.updateSettings);
+  const addWatchedSecondsToday = useSettingsStore((s) => s.addWatchedSecondsToday);
+  const getWatchedTodaySeconds = useSettingsStore((s) => s.getWatchedTodaySeconds);
+  const { subtitleEnOn, subtitleViOn, autoPlayNext } = settings;
+  const toggleSubtitleEn = () => updateChildSettings(activeChildId, { subtitleEnOn: !settings.subtitleEnOn });
+  const toggleSubtitleVi = () => updateChildSettings(activeChildId, { subtitleViOn: !settings.subtitleViOn });
+  const toggleAutoPlayNext = () => updateChildSettings(activeChildId, { autoPlayNext: !settings.autoPlayNext });
+
   const isFavorite = useFavoritesStore((s) => s.favoritesByChild[activeChildId]?.includes(story?.id ?? "") ?? false);
   const toggleFavorite = useFavoritesStore((s) => s.toggleFavorite);
   const lastProgressSaveRef = useRef(0);
+
+  useEffect(() => {
+    configureFeedbackSounds({ enabled: settings.soundEffectsOn, volume: settings.soundEffectsVolume });
+  }, [settings.soundEffectsOn, settings.soundEffectsVolume]);
+
+  // Re-check the daily limit whenever a (new) story opens, so re-entering the player later the
+  // same day picks up a limit already reached earlier, and a fresh day/raised limit unblocks it.
+  useEffect(() => {
+    if (!story) return;
+    const limitSeconds = settings.dailyLimitMinutes != null ? settings.dailyLimitMinutes * 60 : null;
+    setDailyLimitReached(limitSeconds != null && getWatchedTodaySeconds(activeChildId) >= limitSeconds);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [story?.id, settings.dailyLimitMinutes, activeChildId]);
 
   const isVocabKnown = useVocabProgressStore((s) => s.isKnown);
   const setVocabKnown = useVocabProgressStore((s) => s.setKnown);
@@ -230,6 +254,16 @@ export function Player() {
       const ratio = time / duration;
       setStoryProgress(activeChildId, story.id, ratio);
       void api.putProgress(activeChildId, story.id, ratio, deltaSeconds).catch(() => {});
+
+      if (deltaSeconds > 0) {
+        addWatchedSecondsToday(activeChildId, deltaSeconds);
+        const limitSeconds = settings.dailyLimitMinutes != null ? settings.dailyLimitMinutes * 60 : null;
+        if (limitSeconds != null && getWatchedTodaySeconds(activeChildId) >= limitSeconds) {
+          setDailyLimitReached(true);
+          pauseMedia();
+          setIsPaused(true);
+        }
+      }
     }
   };
 
@@ -256,6 +290,15 @@ export function Player() {
     onEnded: handleVideoEnded,
   });
 
+  // Playback speed is a per-child setting (see Settings.tsx) - apply it to whichever backend is
+  // active whenever it changes, and again each time a new story/controller comes online.
+  useEffect(() => {
+    if (!isYoutube && videoRef.current) videoRef.current.playbackRate = settings.playbackSpeed;
+  }, [settings.playbackSpeed, story?.id, isYoutube]);
+  useEffect(() => {
+    if (isYoutube) ytController?.setPlaybackRate(settings.playbackSpeed);
+  }, [settings.playbackSpeed, isYoutube, ytController]);
+
   const playMedia = () => {
     if (isYoutube) ytController?.play();
     else void videoRef.current?.play();
@@ -278,11 +321,11 @@ export function Player() {
 
     return (
       <div className="flex h-full flex-col items-center justify-center gap-4 bg-[#F7FBFF] px-6 text-center">
-        <p className="font-heading text-2xl font-bold text-slate-600">Không tìm thấy truyện</p>
+        <p className="font-heading text-2xl font-bold text-slate-600">{t("player.notFoundTitle")}</p>
         <SolidPillButton
-          label="Về trang chủ"
+          label={t("player.backHomeLabel")}
           color="primary"
-          ariaLabel="Back to home"
+          ariaLabel={t("player.backAriaLabel")}
           onClick={() => navigate("/home")}
         />
       </div>
@@ -460,7 +503,7 @@ export function Player() {
               color="white"
               size={44}
               className="sm:h-14! sm:w-14! landscape-compact:h-9! landscape-compact:w-9!"
-              ariaLabel="Back to home"
+              ariaLabel={t("player.backAriaLabel")}
               onClick={() => navigate("/home")}
             />
             <CircleButton
@@ -468,7 +511,7 @@ export function Player() {
               color="white"
               size={44}
               className="sm:h-14! sm:w-14! landscape-compact:h-9! landscape-compact:w-9!"
-              ariaLabel={isFavorite ? "Bỏ yêu thích" : "Thêm vào yêu thích"}
+              ariaLabel={isFavorite ? t("common.favoriteRemove") : t("common.favoriteAdd")}
               onClick={() => void toggleFavorite(activeChildId, story.id)}
             />
           </div>
@@ -496,9 +539,9 @@ export function Player() {
           <div className="hidden items-center gap-3 sm:flex">
             <SolidPillButton
               icon={<IconHome className="h-5 w-5" />}
-              label="Home"
+              label={t("player.homeLabel")}
               color="pink"
-              ariaLabel="Home"
+              ariaLabel={t("player.homeLabel")}
               onClick={() => navigate("/home")}
             />
           </div>
@@ -590,6 +633,24 @@ export function Player() {
           />
         )}
       </AnimatePresence>
+
+      {dailyLimitReached && (
+        <div
+          className="absolute inset-0 z-50 flex flex-col items-center justify-center gap-4 bg-black/85 px-6 text-center"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <span className="text-6xl">🌙</span>
+          <p className="font-heading text-2xl font-bold text-white">{t("settings.dailyLimitTitle")}</p>
+          <p className="max-w-xs font-body text-white/80">{t("settings.dailyLimitMessage")}</p>
+          <SolidPillButton
+            label={t("settings.dailyLimitBackHome")}
+            color="primary"
+            ariaLabel={t("settings.dailyLimitBackHome")}
+            onClick={() => navigate("/home")}
+            className="mt-2 px-8 py-3.5 text-lg"
+          />
+        </div>
+      )}
     </div>
   );
 }

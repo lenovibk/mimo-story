@@ -7,6 +7,8 @@ import { SkyBackground } from "@/components/SkyBackground/SkyBackground";
 import { getCategoryIcon } from "@/data/categoryVisuals";
 import { useEnsureCatalogLoaded } from "@/hooks/useEnsureCatalogLoaded";
 import { useEnsureGuestSession } from "@/hooks/useEnsureGuestSession";
+import { useTranslation } from "@/i18n/useTranslation";
+import type { TranslationKey } from "@/i18n/translate";
 import { api } from "@/services/api";
 import { useAuthStore } from "@/store/useAuthStore";
 import { useCatalogStore } from "@/store/useCatalogStore";
@@ -17,11 +19,11 @@ const AGE_COLORS = ["#FF92C2", "#FFB25C", "#FFD54A", "#8EE28E", "#5CC8FF"];
 
 type Step = 0 | 1 | 2 | 3;
 
-const STEP_META: { emoji: string; title: string; accent: string; btnColor: ButtonColor }[] = [
-  { emoji: "🎈", title: "Bé nhà mình là...", accent: "#5CC8FF", btnColor: "primary" },
-  { emoji: "✏️", title: "Tên của bé là gì?", accent: "#FF92C2", btnColor: "pink" },
-  { emoji: "🎂", title: "Bé mấy tuổi rồi?", accent: "#FFB25C", btnColor: "yellow" },
-  { emoji: "🌈", title: "Bé thích gì nhất?", accent: "#8EE28E", btnColor: "green" },
+const STEP_META: { emoji: string; titleKey: TranslationKey; accent: string; btnColor: ButtonColor }[] = [
+  { emoji: "🎈", titleKey: "onboarding.stepGenderTitle", accent: "#5CC8FF", btnColor: "primary" },
+  { emoji: "✏️", titleKey: "onboarding.stepNameTitle", accent: "#FF92C2", btnColor: "pink" },
+  { emoji: "🎂", titleKey: "onboarding.stepAgeTitle", accent: "#FFB25C", btnColor: "yellow" },
+  { emoji: "🌈", titleKey: "onboarding.stepInterestsTitle", accent: "#8EE28E", btnColor: "green" },
 ];
 
 const SPARKLES = [
@@ -33,6 +35,7 @@ const SPARKLES = [
 
 export function Onboarding() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const token = useEnsureGuestSession();
   useEnsureCatalogLoaded();
   const categories = useCatalogStore((s) => s.categories);
@@ -112,7 +115,7 @@ export function Onboarding() {
               icon={<IconChevronLeft className="h-5 w-5" />}
               color="white"
               size={36}
-              ariaLabel="Quay lại"
+              ariaLabel={t("onboarding.backAriaLabel")}
               onClick={handleBack}
               className="text-slate-500 shadow-none ring-slate-200"
             />
@@ -160,7 +163,7 @@ export function Onboarding() {
               >
                 {meta.emoji}
               </span>
-              <p className="font-heading text-lg font-extrabold text-slate-700">{meta.title}</p>
+              <p className="font-heading text-lg font-extrabold text-slate-700">{t(meta.titleKey)}</p>
             </motion.div>
 
             {step === 0 && (
@@ -201,7 +204,9 @@ export function Onboarding() {
                       >
                         {g === "boy" ? "👦" : "👧"}
                       </motion.span>
-                      <span className="font-heading font-bold text-slate-700">{g === "boy" ? "Bé trai" : "Bé gái"}</span>
+                      <span className="font-heading font-bold text-slate-700">
+                        {g === "boy" ? t("onboarding.boyLabel") : t("onboarding.girlLabel")}
+                      </span>
                     </motion.button>
                   );
                 })}
@@ -215,7 +220,7 @@ export function Onboarding() {
                   autoFocus
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder="Nhập tên bé"
+                  placeholder={t("onboarding.namePlaceholder")}
                   className="w-full rounded-2xl border-2 border-slate-200 px-4 py-3.5 text-center font-heading text-lg text-slate-700 outline-none transition-colors focus:border-[#FF92C2]"
                 />
                 <motion.div
@@ -232,7 +237,7 @@ export function Onboarding() {
                     {gender === "boy" ? "👦" : gender === "girl" ? "👧" : "🧒"}
                   </motion.span>
                   <p className="font-heading text-sm font-bold text-white drop-shadow-sm">
-                    Chào {name.trim() || "bạn nhỏ"}! 👋
+                    {t("onboarding.greeting", { name: name.trim() || t("onboarding.greetingFallbackName") })}
                   </p>
                 </motion.div>
               </div>
@@ -271,14 +276,14 @@ export function Onboarding() {
                     );
                   })}
                 </div>
-                <p className="font-body text-xs text-slate-400">tuổi</p>
+                <p className="font-body text-xs text-slate-400">{t("onboarding.ageUnit")}</p>
               </div>
             )}
 
             {step === 3 && (
               <div className="flex w-full flex-col gap-3">
                 <p className="-mt-2 font-body text-xs text-slate-400">
-                  Chọn một hoặc nhiều mục - có thể đổi sau ({interests.length} đã chọn)
+                  {t("onboarding.interestsHint", { count: interests.length })}
                 </p>
                 <div className="grid grid-cols-2 gap-3">
                   {categories.map((c, i) => {
@@ -328,9 +333,9 @@ export function Onboarding() {
         </AnimatePresence>
 
         <SolidPillButton
-          label={saving ? "Đang lưu..." : step === 3 ? "Hoàn tất 🎉" : "Tiếp tục"}
+          label={saving ? t("onboarding.saving") : step === 3 ? t("onboarding.finish") : t("onboarding.continueLabel")}
           color={meta.btnColor}
-          ariaLabel="Tiếp tục"
+          ariaLabel={t("onboarding.continueLabel")}
           disabled={!canNext || saving || (step === 3 && !token)}
           onClick={handleNext}
           className="mt-6 w-full justify-center py-3.5 text-lg"

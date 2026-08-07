@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
 import { SolidPillButton } from "@/components/Button/Button";
 import { IconCheck, IconHome, IconPlay, IconStar } from "@/components/Icon/Icon";
+import { useTranslation } from "@/i18n/useTranslation";
 
 interface StoryEndDialogProps {
   nextTitle: string;
@@ -17,6 +18,8 @@ export function StoryEndDialog({
   onBackToList,
   onContinue,
 }: StoryEndDialogProps) {
+  const { t } = useTranslation();
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -32,25 +35,25 @@ export function StoryEndDialog({
         className="flex w-full max-w-sm flex-col items-center gap-4 rounded-[32px] bg-white px-8 py-8 text-center shadow-2xl"
       >
         <IconStar className="h-10 w-10 text-[#FFD54A]" />
-        <p className="font-heading text-2xl font-extrabold text-[#5CC8FF] sm:text-3xl">Xong rồi!</p>
+        <p className="font-heading text-2xl font-extrabold text-[#5CC8FF] sm:text-3xl">{t("storyEndDialog.title")}</p>
         <p className="font-heading text-sm font-medium text-slate-500">
-          Truyện tiếp theo: <span className="text-slate-700">{nextTitle}</span>
+          {t("storyEndDialog.nextTitlePrefix")} <span className="text-slate-700">{nextTitle}</span>
         </p>
 
         <div className="mt-1 flex w-full flex-col gap-3">
           <SolidPillButton
-            label="Truyện tiếp theo"
+            label={t("storyEndDialog.continueLabel")}
             icon={<IconPlay className="h-5 w-5" />}
             color="green"
-            ariaLabel="Play next story"
+            ariaLabel={t("storyEndDialog.continueAriaLabel")}
             onClick={onContinue}
             className="w-full justify-center px-8 py-4 text-lg"
           />
           <SolidPillButton
-            label="Về danh sách"
+            label={t("storyEndDialog.backToListLabel")}
             icon={<IconHome className="h-5 w-5" />}
             color="primary"
-            ariaLabel="Back to story list"
+            ariaLabel={t("storyEndDialog.backToListAriaLabel")}
             onClick={onBackToList}
             className="w-full justify-center px-8 py-4 text-lg"
           />
@@ -60,7 +63,7 @@ export function StoryEndDialog({
           type="button"
           onClick={onToggleAutoPlay}
           aria-pressed={autoPlayNext}
-          aria-label="Toggle autoplay next story"
+          aria-label={t("storyEndDialog.autoPlayAriaLabel")}
           className="mt-1 flex items-center gap-2 font-heading text-sm font-semibold text-slate-500"
         >
           <span
@@ -70,7 +73,7 @@ export function StoryEndDialog({
           >
             <IconCheck className="h-3.5 w-3.5" />
           </span>
-          Tự động phát truyện tiếp theo
+          {t("storyEndDialog.autoPlayLabel")}
         </button>
       </motion.div>
     </motion.div>

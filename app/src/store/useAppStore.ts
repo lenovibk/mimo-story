@@ -12,15 +12,8 @@ interface AppState {
   starsByChild: Record<string, number>;
   addStars: (childId: string, amount: number) => void;
 
-  subtitleEnOn: boolean;
-  subtitleViOn: boolean;
   shadowingOn: boolean;
-  toggleSubtitleEn: () => void;
-  toggleSubtitleVi: () => void;
   toggleShadowing: () => void;
-
-  autoPlayNext: boolean;
-  toggleAutoPlayNext: () => void;
 
   storyProgressByChild: Record<string, Record<string, StoryProgress>>;
   setStoryProgress: (childId: string, storyId: string, ratio: number) => void;
@@ -38,15 +31,8 @@ export const useAppStore = create<AppState>()(
           starsByChild: { ...state.starsByChild, [childId]: (state.starsByChild[childId] ?? 0) + amount },
         })),
 
-      subtitleEnOn: true,
-      subtitleViOn: true,
       shadowingOn: false,
-      toggleSubtitleEn: () => set((state) => ({ subtitleEnOn: !state.subtitleEnOn })),
-      toggleSubtitleVi: () => set((state) => ({ subtitleViOn: !state.subtitleViOn })),
       toggleShadowing: () => set((state) => ({ shadowingOn: !state.shadowingOn })),
-
-      autoPlayNext: false,
-      toggleAutoPlayNext: () => set((state) => ({ autoPlayNext: !state.autoPlayNext })),
 
       storyProgressByChild: {},
       setStoryProgress: (childId, storyId, ratio) =>

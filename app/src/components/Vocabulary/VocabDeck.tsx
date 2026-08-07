@@ -2,6 +2,7 @@ import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { IconCheck, IconX } from "@/components/Icon/Icon";
 import { VocabFlashcard } from "@/components/Vocabulary/VocabFlashcard";
+import { useTranslation } from "@/i18n/useTranslation";
 import type { GrammarPoint, VocabItem } from "@/types";
 
 interface VocabDeckProps {
@@ -16,6 +17,7 @@ interface VocabDeckProps {
  * the grammar points, so a child can browse the whole lesson instead of only catching words
  * as they scroll by in the dialogue. Opened from the player's "Từ vựng" floating button. */
 export function VocabDeck({ vocab, grammar, isKnown, onToggleKnown, onClose }: VocabDeckProps) {
+  const { t } = useTranslation();
   const [openVocabId, setOpenVocabId] = useState<string | null>(null);
   const openItem = vocab.find((v) => v.id === openVocabId) ?? null;
 
@@ -36,20 +38,22 @@ export function VocabDeck({ vocab, grammar, isKnown, onToggleKnown, onClose }: V
         className="mt-auto flex max-h-[80vh] flex-col rounded-t-[32px] bg-white px-6 pt-5 pb-[max(1.25rem,var(--safe-b))] shadow-2xl"
       >
         <div className="mb-3 flex items-center justify-between">
-          <p className="font-heading text-xl font-extrabold text-[#5CC8FF]">Từ vựng & Ngữ pháp</p>
-          <button type="button" onClick={onClose} aria-label="Đóng" className="text-slate-300 hover:text-slate-500">
+          <p className="font-heading text-xl font-extrabold text-[#5CC8FF]">{t("vocab.deckTitle")}</p>
+          <button type="button" onClick={onClose} aria-label={t("vocab.closeAriaLabel")} className="text-slate-300 hover:text-slate-500">
             <IconX className="h-6 w-6" />
           </button>
         </div>
 
         <div className="flex-1 overflow-y-auto">
           {vocab.length === 0 && grammar.length === 0 ? (
-            <p className="py-8 text-center font-heading text-sm text-slate-400">Bài học này chưa có từ vựng/ngữ pháp.</p>
+            <p className="py-8 text-center font-heading text-sm text-slate-400">{t("vocab.emptyMessage")}</p>
           ) : (
             <>
               {vocab.length > 0 && (
                 <div className="mb-5">
-                  <p className="mb-2 font-heading text-sm font-bold text-slate-500">Từ vựng ({vocab.length})</p>
+                  <p className="mb-2 font-heading text-sm font-bold text-slate-500">
+                    {t("vocab.vocabSectionTitle", { count: vocab.length })}
+                  </p>
                   <div className="flex flex-wrap gap-2">
                     {vocab.map((v) => {
                       const known = isKnown(v.id);
@@ -73,7 +77,9 @@ export function VocabDeck({ vocab, grammar, isKnown, onToggleKnown, onClose }: V
 
               {grammar.length > 0 && (
                 <div>
-                  <p className="mb-2 font-heading text-sm font-bold text-slate-500">Ngữ pháp ({grammar.length})</p>
+                  <p className="mb-2 font-heading text-sm font-bold text-slate-500">
+                    {t("vocab.grammarSectionTitle", { count: grammar.length })}
+                  </p>
                   <div className="flex flex-col gap-2.5">
                     {grammar.map((g) => (
                       <div key={g.id} className="rounded-2xl bg-[#5B4B9A]/8 px-4 py-3 text-left">

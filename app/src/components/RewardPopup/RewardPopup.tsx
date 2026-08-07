@@ -2,9 +2,17 @@ import { motion } from "framer-motion";
 import { useMemo, useRef, useState } from "react";
 import { SolidPillButton } from "@/components/Button/Button";
 import { IconMic, IconPause, IconPlay, IconStar, IconStarOutline } from "@/components/Icon/Icon";
+import { useTranslation } from "@/i18n/useTranslation";
+import type { TranslationKey } from "@/i18n/translate";
 import type { StarRating, WordMatch } from "@/types";
 
-const PRAISE = ["Excellent!", "Amazing!", "Great Job!", "Awesome!", "Let's Go!"];
+const PRAISE_KEYS: TranslationKey[] = [
+  "rewardPopup.praise1",
+  "rewardPopup.praise2",
+  "rewardPopup.praise3",
+  "rewardPopup.praise4",
+  "rewardPopup.praise5",
+];
 const CONFETTI_COLORS = ["#5CC8FF", "#FFD54A", "#FF92C2", "#8EE28E", "#FFFFFF"];
 
 interface RewardPopupProps {
@@ -17,7 +25,8 @@ interface RewardPopupProps {
 }
 
 export function RewardPopup({ stars, passed, words, audioUrl, onContinue, onRetry }: RewardPopupProps) {
-  const praise = useMemo(() => PRAISE[Math.floor(Math.random() * PRAISE.length)], []);
+  const { t } = useTranslation();
+  const praiseKey = useMemo(() => PRAISE_KEYS[Math.floor(Math.random() * PRAISE_KEYS.length)], []);
   const audioRef = useRef<HTMLAudioElement>(null);
   const [playing, setPlaying] = useState(false);
 
@@ -86,7 +95,7 @@ export function RewardPopup({ stars, passed, words, audioUrl, onContinue, onRetr
         </div>
 
         <p className="font-heading text-3xl font-extrabold text-[#5CC8FF] sm:text-4xl">
-          {passed ? praise : "Let's try again!"}
+          {passed ? t(praiseKey) : t("rewardPopup.tryAgainTitle")}
         </p>
 
         {words.length > 0 && (
@@ -110,13 +119,13 @@ export function RewardPopup({ stars, passed, words, audioUrl, onContinue, onRetr
           <button
             type="button"
             onClick={togglePlayback}
-            aria-label={playing ? "Pause your recording" : "Play back your recording"}
+            aria-label={playing ? t("rewardPopup.pauseRecordingAriaLabel") : t("rewardPopup.playRecordingAriaLabel")}
             className="flex items-center gap-2 rounded-full bg-[#5CC8FF]/15 py-2 pr-4 pl-2 font-heading text-sm font-bold text-[#2E93C4]"
           >
             <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#5CC8FF] text-white">
               {playing ? <IconPause className="h-4 w-4" /> : <IconPlay className="h-4 w-4" />}
             </span>
-            Hear yourself
+            {t("rewardPopup.hearYourself")}
             <audio
               ref={audioRef}
               src={audioUrl}
@@ -131,42 +140,42 @@ export function RewardPopup({ stars, passed, words, audioUrl, onContinue, onRetr
         {passed ? (
           <>
             <p className="flex items-center gap-1 font-heading text-lg font-bold text-[#FFD54A]">
-              +10 <IconStar className="h-5 w-5" /> Stars
+              {t("rewardPopup.starsEarned")} <IconStar className="h-5 w-5" />
             </p>
             <SolidPillButton
-              label="Continue"
+              label={t("rewardPopup.continueLabel")}
               icon={<IconPlay className="h-5 w-5" />}
               color="green"
-              ariaLabel="Continue story"
+              ariaLabel={t("rewardPopup.continueAriaLabel")}
               onClick={onContinue}
               className="mt-1 px-8 py-4 text-xl"
             />
             <button
               type="button"
               onClick={onRetry}
-              aria-label="Try again"
+              aria-label={t("rewardPopup.tryAgainAriaLabel")}
               className="font-heading text-sm font-semibold text-slate-400 underline-offset-2 hover:underline"
             >
-              Try Again
+              {t("rewardPopup.tryAgainLabel")}
             </button>
           </>
         ) : (
           <>
             <SolidPillButton
-              label="Try Again"
+              label={t("rewardPopup.tryAgainLabel")}
               icon={<IconMic className="h-5 w-5" />}
               color="pink"
-              ariaLabel="Try again"
+              ariaLabel={t("rewardPopup.tryAgainAriaLabel")}
               onClick={onRetry}
               className="mt-1 px-8 py-4 text-xl"
             />
             <button
               type="button"
               onClick={onContinue}
-              aria-label="Skip practice and continue story"
+              aria-label={t("rewardPopup.skipAriaLabel")}
               className="font-heading text-sm font-semibold text-slate-400 underline-offset-2 hover:underline"
             >
-              Skip
+              {t("rewardPopup.skipLabel")}
             </button>
           </>
         )}

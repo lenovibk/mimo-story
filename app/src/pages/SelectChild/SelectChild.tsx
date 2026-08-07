@@ -5,10 +5,12 @@ import { SolidPillButton } from "@/components/Button/Button";
 import { Logo } from "@/components/Logo/Logo";
 import { SkyBackground } from "@/components/SkyBackground/SkyBackground";
 import { useEnsureGuestSession } from "@/hooks/useEnsureGuestSession";
+import { useTranslation } from "@/i18n/useTranslation";
 import { useAuthStore } from "@/store/useAuthStore";
 
 export function SelectChild() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const token = useEnsureGuestSession();
   const children = useAuthStore((s) => s.children);
   const setActiveChild = useAuthStore((s) => s.setActiveChild);
@@ -33,7 +35,7 @@ export function SelectChild() {
         className="safe-px relative flex w-full max-w-sm flex-col items-center gap-6 rounded-[28px] bg-white p-8 text-center shadow-2xl"
       >
         <Logo />
-        <p className="font-heading text-lg font-bold text-slate-700">Bé nào đang xem nhỉ?</p>
+        <p className="font-heading text-lg font-bold text-slate-700">{t("selectChild.title")}</p>
 
         <div className="grid w-full grid-cols-2 gap-3">
           {children.map((child) => (
@@ -50,9 +52,9 @@ export function SelectChild() {
         </div>
 
         <SolidPillButton
-          label="+ Thêm bé"
+          label={t("selectChild.addChildLabel")}
           color="white"
-          ariaLabel="Thêm bé mới"
+          ariaLabel={t("selectChild.addChildAriaLabel")}
           onClick={() => navigate("/onboarding")}
           className="w-full justify-center py-3 text-slate-500"
         />
