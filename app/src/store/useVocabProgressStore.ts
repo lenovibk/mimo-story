@@ -6,6 +6,11 @@ interface VocabProgressState {
   // Keyed by childId -> vocabId -> "known" | "new".
   statusByChild: Record<string, Record<string, "known" | "new">>;
 
+  /** Reads current status. Fine to call from an event handler or via `getState()`, but
+   * do NOT select it as a hook (`useVocabProgressStore((s) => s.isKnown)`) expecting
+   * re-renders on change - this function's reference never changes, so components won't
+   * re-render when statusByChild updates. Select `statusByChild` itself instead and derive
+   * the boolean in the component (see Player.tsx). */
   isKnown: (childId: string, vocabId: string) => boolean;
   loadProgress: (childId: string) => Promise<void>;
   setKnown: (childId: string, vocabId: string, known: boolean) => Promise<void>;

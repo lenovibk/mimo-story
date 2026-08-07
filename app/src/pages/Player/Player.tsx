@@ -129,7 +129,12 @@ export function Player() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [story?.id, settings.dailyLimitMinutes, activeChildId]);
 
-  const isVocabKnown = useVocabProgressStore((s) => s.isKnown);
+  // Subscribe to the reactive statusByChild slice itself, not the `isKnown` getter -
+  // that method's function reference never changes across store updates, so selecting
+  // it (`s.isKnown`) never triggers a re-render when a word gets checked. statusByChild
+  // gets a fresh object on every toggle/load, so this actually re-renders on change.
+  const vocabStatusByChild = useVocabProgressStore((s) => s.statusByChild);
+  const isVocabKnown = (childId: string, vocabId: string) => vocabStatusByChild[childId]?.[vocabId] === "known";
   const setVocabKnown = useVocabProgressStore((s) => s.setKnown);
   const loadVocabProgress = useVocabProgressStore((s) => s.loadProgress);
   useEffect(() => {
